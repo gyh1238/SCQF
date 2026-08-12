@@ -17,7 +17,7 @@ Panels, each carrying one checkable claim rather than an illustration:
      decimation committed.  This is what the retained joint list buys and
      what a scalar-preference exchange cannot reproduce;
 
- (d) the decimation order itself: confidence against commitment step.
+ (d) the order decimation fixed the boundary UEs: one point per UE.
 
 The instance is drawn from the same generator as the scaling figure and is
 the median-quality run of its size, so the picture is typical, not selected.
@@ -46,6 +46,15 @@ BETA = 1.5
 K_ACCEPT = 2000
 N_ZONE_PANELS = 4
 N_BND_PANELS = 3
+
+
+def _count(n):
+    """Compact shot count: 7.6e4 reads worse than 76k on a small panel."""
+    if n >= 1e6:
+        return f"{n/1e6:.1f}M"
+    if n >= 1e3:
+        return f"{n/1e3:.0f}k"
+    return f"{n:.0f}"
 
 
 def _save(fig, stem, formats=("pdf", "svg"), **kw):
@@ -178,7 +187,8 @@ def panel_zone_law(ax, r, zcol, first):
     ax.set_xlim(-0.8, len(ref) + pad)
     ax.set_title(f"zone Z{zone.idx}: $N_z$={zone.n_ue}, "
                  f"$|\\mathcal{{F}}_z|$={len(ref)}\n"
-                 f"$\\mu_z$={r['mu']:.3f}, $k$={r['rounds']} rounds", fontsize=7.5)
+                 f"$\\mu_z$={r['mu']:.3f}, "
+                 f"{_count(K_ACCEPT / max(r['mu'], 1e-12))} shots", fontsize=7.5)
     ax.set_xlabel("assignment, ranked by $J_z$", fontsize=7)
     if first:
         ax.set_ylabel("accepted probability", fontsize=8)
@@ -220,13 +230,20 @@ def panel_boundary(ax, t, inst, reports, holders, zcol, first):
 
 
 def panel_order(ax, res):
-    """(d) decimation commits the least ambiguous boundary UE first."""
+    """(d) the order decimation fixed the boundary UEs.
+
+    One point per boundary UE, not per iteration: the x position is where
+    that UE fell in the commitment sequence, so the panel says which
+    overlaps were resolved early, not how many times anything was repeated.
+    """
     conf = [t["conf"] for t in res["trace"]]
     ax.plot(np.arange(1, len(conf) + 1), conf, ".", ms=4, color="#1f6fb4")
     ax.set_ylim(0.4, 1.02)
-    ax.set_xlabel("commitment step", fontsize=7)
+    ax.set_xlabel("boundary UE, in decimation order", fontsize=7)
     ax.set_ylabel(r"confidence $\max_v b_i(v)$", fontsize=7.5)
-    ax.set_title(f"decimation order\n{res['exceptions']} exception re-samples",
+    n_exc = res["exceptions"]
+    ax.set_title(f"each boundary UE fixed once,\nleast ambiguous first "
+                 f"({n_exc} exception re-sample{'' if n_exc == 1 else 's'})",
                  fontsize=7.5)
     ax.grid(alpha=0.3, lw=0.5)
     ax.tick_params(labelsize=6.5)

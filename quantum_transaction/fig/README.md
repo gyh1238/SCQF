@@ -25,7 +25,7 @@ Panels:
 | `panels/snapshot_c1_boundary_UE27.*` | (c1) boundary UE 27, zones Z0+Z2 |
 | `panels/snapshot_c2_boundary_UE40.*` | (c2) boundary UE 40, zones Z5+Z6 |
 | `panels/snapshot_c3_boundary_UE14.*` | (c3) boundary UE 14, zones Z8+Z9 |
-| `panels/snapshot_d_decimation_order.*` | (d) decimation order |
+| `panels/snapshot_d_decimation_order.*` | (d) order the boundary UEs were fixed |
 | `panels/scaling_a_circuit_cost.*` | (a) two-qubit gate count vs. zones |
 | `panels/scaling_b_utility_ratio.*` | (b) utility ratio vs. zones |
 
@@ -92,11 +92,26 @@ admission limit constrain the same choice.
 | $\theta_{z,i,r}=2\arccos\sqrt{g_{z,i}(r)}$ | controlled-$R_Y$ angle |
 | $p_z(\bm r_z)\propto e^{\lambda J_z}$ on $\mathcal{F}_z$ | the accepted-branch law — what panels (b) show |
 | $\mu_z$ | acceptance mass: probability one circuit execution lands in the accepted branch, before amplification |
-| $k$ | amplitude-amplification rounds, $k\approx\frac{\pi}{4\arcsin\sqrt{\mu_z}}-\frac12$ |
-| $P_z(k)=\sin^2[(2k+1)\arcsin\sqrt{\mu_z}]$ | acceptance probability after $k$ rounds |
+| $k$ | amplitude-amplification rounds. **These figures use $k=0$**; see below |
+| $P_z(k)=\sin^2[(2k+1)\arcsin\sqrt{\mu_z}]$ | acceptance probability after $k$ rounds; $P_z(0)=\mu_z$ |
 
-A smaller $\mu_z$ means a tighter zone and a more expensive draw: the shot
-count per accepted sample is $\approx K_z/P_z(k)$.
+A smaller $\mu_z$ means a tighter zone and a more expensive draw: collecting
+$K_z$ accepted samples costs $\approx K_z/P_z(k)$ shots, which at $k=0$ is
+simply $K_z/\mu_z$.
+
+> **Why the panels report shots and not rounds.** Amplification does not change
+> the output law: it moves probability between the accepted and rejected
+> branches and nothing else, so a measurement landing in the accepted branch
+> follows $p_z$ for every $k$, including $k=0$. It only trades circuit depth
+> for shot count — and on the devices measured here that trade is not yet
+> available. The optimal schedule for the tightest zone in the snapshot
+> ($\mu_z=0.0009$) is $k=26$, i.e. $2k+1=53$ passes and $54{,}166$ two-qubit
+> gates, against a measured half-signal point of 587 (Heron2) or 1019
+> (Heron3). Quoting $k$ would suggest the protocol requires 26 Grover
+> iterations; it does not require any. The panels therefore report $\mu_z$ and
+> the unamplified shot count, which is what a run actually pays. The
+> asymptotic $1/\mu_z \rightarrow 1/\sqrt{\mu_z}$ gain from amplification is
+> real, but it is not what these figures measure.
 
 ### Coordination (Sec. IV-C)
 
@@ -175,8 +190,8 @@ The four zones with the largest $\vert\mathcal{F}_z\vert$.
   zero** mass — that is strict feasibility made visible, and it is the
   difference from a penalty formulation, which would place small but non-zero
   mass there.
-- **title**: $N_z$, $\vert\mathcal{F}_z\vert$, $\mu_z$, and the amplification
-  rounds $k$ that $\mu_z$ implies.
+- **title**: $N_z$, $\vert\mathcal{F}_z\vert$, $\mu_z$, and $K_z/\mu_z$ — the
+  shots that collecting this zone's report costs without amplification.
 
 Bars tracking the step curve is the claim that the sampler reproduces the
 circuit's law; `haiq_certify.py` checks the same statement exactly against a
@@ -197,10 +212,16 @@ Where the two coloured bars disagree, the panel shows two zones pulling in
 opposite directions and the product resolving it. A scalar-preference exchange
 would transmit one number per UE and could not express this.
 
-### (d) decimation order
+### (d) the order decimation fixed the boundary UEs
 
-- **x**: commitment step, 1 … $\vert\mathcal{B}\vert$.
-- **y**: the confidence $\max_v b_i(v)$ of the UE committed at that step.
+- **x**: the boundary UEs, ordered by when decimation fixed them, 1 …
+  $\vert\mathcal{B}\vert$. **One point is one UE, not one iteration.** Each
+  boundary UE is committed exactly once, so the axis says which overlaps were
+  resolved early — it is not a count of repeated passes over anything.
+  Repetition, where it occurs, is counted separately as the exception
+  re-samples named in the title.
+- **y**: the confidence $\max_v b_i(v)$ of that UE, taken when decimation
+  opened it for commitment.
 
 The downward trend is the procedure working as intended: the least ambiguous
 boundary UEs are fixed first, and each commitment conditions the retained
@@ -228,9 +249,10 @@ so the axis reads in both units: 5 zones / 18 UEs up to 45 zones / 162 UEs.
 - **grey dotted / dash-dot lines**: the measured Heron2 and Heron3 half-signal
   points, for scale.
 
-Comparing at one oracle pass is deliberate and conservative: a centralized
-circuit has a smaller accepted mass and would need *more* amplification rounds
-than a zone, so the gap shown understates the real one.
+Comparing at one oracle pass is deliberate and conservative. Neither curve
+includes amplification, which the figures do not use; if it were added, the
+centralized circuit would need *more* rounds than a zone because its accepted
+mass is smaller, so the gap shown understates the real one.
 
 ### (b) utility ratio
 
