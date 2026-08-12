@@ -3,3 +3,6 @@ __pycache__/
 
 # machine-local Claude Code permissions
 .claude/settings.local.json
+
+# working copy for reference; the manuscript is maintained elsewhere
+quantum_transaction/manuscript.tex
