@@ -23,6 +23,7 @@ Usage:  python make_fig_scaling.py [--recollect]
 """
 
 import argparse
+import glob
 import os
 import time
 
@@ -41,7 +42,8 @@ CACHE = "scaling_data.npz"
 G_VALUES = (3, 4, 5, 6, 7, 8, 9)
 SEEDS = tuple(range(6))
 BETA = 1.5
-K_ACCEPT = 400
+K_ACCEPT = 200
+SHOT_BUDGET = 10_000
 
 
 def collect(verbose=True):
@@ -59,7 +61,8 @@ def collect(verbose=True):
                 continue
             part = partition_aps(inst)
             res = run_protocol(inst, part, beta=BETA, ubar=utility_scale(inst),
-                               k_accept=K_ACCEPT, rng=np.random.default_rng(1000 + s))
+                               k_accept=K_ACCEPT, shot_budget=SHOT_BUDGET,
+                               rng=np.random.default_rng(1000 + s))
             cen = centralized_2q_cost(inst)
             rec.append((g, s, inst.n_ue, res["n_active_zones"],
                         100.0 * res["utility"] / opt,
@@ -69,8 +72,9 @@ def collect(verbose=True):
                         cen["n_qubits"],
                         100.0 * part.boundary_density,
                         res["comm_bits"], res["exceptions"],
-                        float(res["feasible"]), res["max_rounds"],
-                        res["attempts"]))
+                        float(res["feasible"]), res["shots_max"],
+                        res["attempts"], res["n_backed_off"], res["ess_min"],
+                        res["beta_min"]))
             if verbose:
                 print(f"  g={g} seed={s}: UEs={inst.n_ue:3d} zones={res['n_active_zones']:2d} "
                       f"ratio={rec[-1][4]:.2f}% feas={res['feasible']} "
@@ -145,8 +149,9 @@ def panel_quality(ax, x, ratio, rlo, rhi, n_ues, standalone=False):
 
 def plot(arr, skipped):
     cols = dict(g=0, seed=1, n_ue=2, zones=3, ratio=4, zone2q=5, cen2q=6,
-                zoneq=7, cenq=8, bdens=9, bits=10, exc=11, feas=12, rounds=13,
-                attempts=14)
+                zoneq=7, cenq=8, bdens=9, bits=10, exc=11, feas=12,
+                shots_max=13, attempts=14, backed_off=15, ess_min=16,
+                beta_min=17)
     gs = np.unique(arr[:, cols["g"]])
 
     def agg(key):
@@ -174,7 +179,8 @@ def plot(arr, skipped):
     feas = arr[:, cols["feas"]].mean() * 100
     fig.text(0.013, 0.055,
              f"{len(arr)} instances, {len(SEEDS)} seeds per size; shading is one "
-             f"standard deviation (beta={BETA}, K_z={K_ACCEPT})"
+             f"standard deviation (target beta={BETA}, K_z={K_ACCEPT}, "
+             f"shot budget {SHOT_BUDGET:,}/zone)"
              + (f"; {skipped} globally infeasible instances excluded." if skipped
                 else "."),
              fontsize=7, color="#555555")
@@ -191,6 +197,10 @@ def plot(arr, skipped):
 
     # ---- the same panels again, standalone and separately editable -------
     os.makedirs(PANEL_DIR, exist_ok=True)
+    # clear this script's own panels first: names carry zone and UE indices,
+    # so a changed instance would otherwise leave stale files behind
+    for old in glob.glob(f"{PANEL_DIR}/scaling_*"):
+        os.remove(old)
     specs = [
         ("scaling_a_circuit_cost",
          lambda ax: panel_cost(ax, x, z2q, z2lo, z2hi, c2q, standalone=True)),

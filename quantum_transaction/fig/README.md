@@ -18,19 +18,20 @@ Panels:
 | file | panel |
 |---|---|
 | `panels/snapshot_a_partition.*` | (a) the partition |
-| `panels/snapshot_b1_zone_law_Z2.*` | (b1) zone Z2 accepted law |
-| `panels/snapshot_b2_zone_law_Z4.*` | (b2) zone Z4 accepted law |
-| `panels/snapshot_b3_zone_law_Z12.*` | (b3) zone Z12 accepted law |
-| `panels/snapshot_b4_zone_law_Z3.*` | (b4) zone Z3 accepted law |
-| `panels/snapshot_c1_boundary_UE27.*` | (c1) boundary UE 27, zones Z0+Z2 |
-| `panels/snapshot_c2_boundary_UE40.*` | (c2) boundary UE 40, zones Z5+Z6 |
-| `panels/snapshot_c3_boundary_UE14.*` | (c3) boundary UE 14, zones Z8+Z9 |
+| `panels/snapshot_b1_zone_law_Z3.*` | (b1) zone Z3 accepted law |
+| `panels/snapshot_b2_zone_law_Z5.*` | (b2) zone Z5 accepted law |
+| `panels/snapshot_b3_zone_law_Z11.*` | (b3) zone Z11 accepted law |
+| `panels/snapshot_b4_zone_law_Z8.*` | (b4) zone Z8 accepted law |
+| `panels/snapshot_c1_boundary_UE29.*` | (c1) boundary UE 29 |
+| `panels/snapshot_c2_boundary_UE25.*` | (c2) boundary UE 25 |
+| `panels/snapshot_c3_boundary_UE16.*` | (c3) boundary UE 16 |
 | `panels/snapshot_d_decimation_order.*` | (d) order the boundary UEs were fixed |
 | `panels/scaling_a_circuit_cost.*` | (a) two-qubit gate count vs. zones |
 | `panels/scaling_b_utility_ratio.*` | (b) utility ratio vs. zones |
 
 The zone indices and UE indices in the panel names are those of the snapshot
-instance (`g=5, seed=2`); they change if that instance changes.
+instance (`g=5, seed=0`); they change if that instance changes, and each
+script clears its own panels before writing so stale names cannot linger.
 
 Regenerate everything with:
 
@@ -104,25 +105,57 @@ simply $K_z/\mu_z$.
 > branches and nothing else, so a measurement landing in the accepted branch
 > follows $p_z$ for every $k$, including $k=0$. It only trades circuit depth
 > for shot count — and on the devices measured here that trade is not yet
-> available. The optimal schedule for the tightest zone in the snapshot
-> ($\mu_z=0.0009$) is $k=26$, i.e. $2k+1=53$ passes and $54{,}166$ two-qubit
-> gates, against a measured half-signal point of 587 (Heron2) or 1019
-> (Heron3). Quoting $k$ would suggest the protocol requires 26 Grover
-> iterations; it does not require any. The panels therefore report $\mu_z$ and
-> the unamplified shot count, which is what a run actually pays. The
-> asymptotic $1/\mu_z \rightarrow 1/\sqrt{\mu_z}$ gain from amplification is
-> real, but it is not what these figures measure.
+> available, since $2k+1$ passes of a 1–2 k gate circuit leave the coherence
+> budget immediately. Quoting $k$ would suggest the protocol requires Grover
+> iterations; it requires none. The panels report $\mu_z$ and the unamplified
+> shot count, which is what a run actually pays. The asymptotic
+> $1/\mu_z \rightarrow 1/\sqrt{\mu_z}$ gain from amplification is real, but it
+> is not what these figures measure.
+
+### Execution exponent and reconstruction (Sec. IV-C)
+
+A tight zone has a small $\mu_z$, and at $k=0$ the cost of $K_z$ accepted draws
+is $K_z/\mu_z$ — which for the tightest zones ran to $10^6$–$10^8$ shots, far
+past any real run. The remedy is the manuscript's own: **a zone executes at the
+largest exponent its shot budget allows, and the target exponent is restored
+after measurement rather than before it.**
+
+| symbol | meaning | value |
+|---|---|---|
+| shot budget | shots one zone may spend on its report | 10 000 |
+| $\beta_z \le \beta$ | exponent zone $z$ actually executes, the largest with $K_z/\mu_z(\beta_z)\le$ budget | 0.08 – 1.50 |
+| $w^{(k)}=\exp[(\lambda-\lambda_z)J_z^{(k)}]$ | reconstruction weight of draw $k$ | 1 when $\beta_z=\beta$ |
+| $\widetilde K_z=(\sum w)^2/\sum w^2$ | effective sample size after reweighting | $\ge 73$ of $K_z=200$ |
+
+A lower $\beta_z$ makes the accepted law flatter and therefore cheaper to hit;
+the reweighting puts each draw back on the target exponent, and the price is
+paid in effective sample size, not in bias. $\widetilde K_z$ is the honest
+sample count behind a zone's report and is what the exception threshold
+$K_{\min}$ is compared against.
+
+**What the budget costs.** Over 16 instances, capping every zone at 10 000
+shots against no cap at all:
+
+| | utility vs. optimum | worst instance | peak shots in a zone |
+|---|---|---|---|
+| shot budget 10 000 | 99.26 % | 97.99 % | $10^4$ |
+| no budget | 99.31 % | 98.72 % | $2.6\times10^8$ |
+
+A 25 000-fold reduction in the worst zone's shot count costs 0.05 percentage
+points of utility on average, and under 1 point on the worst instance. That is
+the accuracy deliberately traded away to make the protocol executable, and it
+is why the (b) panels are noisier than an unbudgeted run would give.
 
 ### Coordination (Sec. IV-C)
 
 | symbol | meaning | value |
 |---|---|---|
-| $K_z$ | accepted draws each zone reports | 400 (scaling), 2000 (snapshot) |
-| $K_{\min}$ | retained-list floor that triggers re-sampling | 40 |
+| $K_z$ | accepted draws each zone reports | 200 |
+| $K_{\min}$ | effective-sample floor that triggers re-sampling | 25 |
 | $\pi_{z,i}(v)$ | marginal of boundary UE $i$ held by zone $z$ (Laplace-smoothed, $\alpha=0.5$) | — |
 | $b_i(v)\propto\prod_z\pi_{z,i}(v)$ | consensus belief over UE $i$'s candidates | — |
 | confidence | $\max_v b_i(v)$; decimation commits the highest first | — |
-| exception re-sample | a zone re-drawn because conditioning emptied its list | 1 in the snapshot |
+| exception re-sample | a zone re-drawn because conditioning drove its ESS below $K_{\min}$ | 5 in the snapshot |
 
 ### Hardware and circuit cost (Sec. V-C)
 
@@ -156,7 +189,7 @@ growing `g` grows the *global* problem without changing local structure.
 
 ## 3. `fig_snapshot` — one region, opened up
 
-Instance `g=5, seed=2`: 25 APs, 50 UEs, 13 zones, 26 boundary UEs (52 %).
+Instance `g=5, seed=0`: 25 APs, 50 UEs, 13 zones, 23 boundary UEs (46 %).
 It is the **median** of 8 seeds by utility ratio, so the picture is typical
 rather than selected.
 
@@ -184,7 +217,10 @@ The four zones with the largest $\vert\mathcal{F}_z\vert$.
 - **x**: local assignments of that zone, ranked by $J_z$, best first. Rank
   runs over $\mathcal{F}_z$ only.
 - **y**: probability of being the accepted outcome.
-- **coloured bars**: measured frequency over the $K_z=2000$ accepted draws.
+- **coloured bars**: the zone's own draws, carrying their reconstruction
+  weights. A zone that executed at $eta_z<eta$ contributes draws from a
+  flatter law; the weights are what put them back on the target exponent, so
+  the bars and the reference curve are comparable either way.
 - **black step**: the exact reference $p_z\propto e^{\lambda J_z}$.
 - **shaded band on the right**: the infeasible region. It carries **exactly
   zero** mass — that is strict feasibility made visible, and it is the
@@ -194,7 +230,8 @@ The four zones with the largest $\vert\mathcal{F}_z\vert$.
   shots that collecting this zone's report costs without amplification.
 
 Bars tracking the step curve is the claim that the sampler reproduces the
-circuit's law; `haiq_certify.py` checks the same statement exactly against a
+circuit's law. Departures are finite-sample noise at $K_z=200$, larger where
+$\widetilde K_z$ is smaller; `haiq_certify.py` checks the same statement exactly against a
 Qiskit statevector (max TVD $2.7\times10^{-15}$, zero spurious states).
 
 ### (c1)–(c3) boundary coordination

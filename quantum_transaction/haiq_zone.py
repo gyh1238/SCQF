@@ -219,6 +219,46 @@ def sample_zone(zone, lam, k_accept, rng, pinned=None, max_draws=400_000):
     return codes_out, util_out, mu_hat, draws
 
 
+def choose_execution_exponent(zone, beta_target, ubar, k_accept, shot_budget,
+                              tol=1e-3):
+    """
+    Largest exponent this zone can afford to execute, Sec. IV-C of the paper.
+
+    A tight zone has a small acceptance mass, and collecting K_z accepted
+    draws at the target exponent can cost far more shots than any run has.
+    The remedy is not to shrink the target but to execute at a lower
+    beta_z <= beta, where the accepted law is flatter and therefore cheaper
+    to hit, and to restore the target exponent after measurement by
+    reweighting each recorded draw (see `haiq_protocol`).
+
+    Returns (beta_z, mu_z, shots, k_eff).  `k_eff` is below `k_accept` only
+    when even the uniform law (beta_z = 0) cannot meet the budget, in which
+    case the zone reports fewer draws rather than exceeding it.
+    """
+    def shots_at(b):
+        mu = acceptance_mass(zone, b / ubar)
+        return mu, (k_accept / mu if mu > 0 else np.inf)
+
+    mu, s = shots_at(beta_target)
+    if s <= shot_budget:
+        return beta_target, mu, s, k_accept
+
+    mu0, s0 = shots_at(0.0)
+    if s0 > shot_budget:                       # even the uniform law is too dear
+        k_eff = max(1, int(shot_budget * mu0))
+        return 0.0, mu0, k_eff / mu0, k_eff
+
+    lo, hi = 0.0, beta_target                  # feasible at lo, not at hi
+    while hi - lo > tol:
+        mid = 0.5 * (lo + hi)
+        if shots_at(mid)[1] <= shot_budget:
+            lo = mid
+        else:
+            hi = mid
+    mu, s = shots_at(lo)
+    return lo, mu, s, k_accept
+
+
 def amplification_rounds(mu):
     """k = round(pi/4 / arcsin sqrt(mu)) - 1/2, the standard Grover schedule."""
     mu = float(np.clip(mu, 1e-12, 1.0))

@@ -25,6 +25,7 @@ the median-quality run of its size, so the picture is typical, not selected.
 Usage:  python make_fig_snapshot.py
 """
 
+import glob
 import os
 
 import numpy as np
@@ -43,7 +44,8 @@ PANEL_DIR = "fig/panels"
 
 G = 5
 BETA = 1.5
-K_ACCEPT = 2000
+K_ACCEPT = 200
+SHOT_BUDGET = 10_000
 N_ZONE_PANELS = 4
 N_BND_PANELS = 3
 
@@ -73,8 +75,8 @@ def pick_median_seed(seeds=range(8)):
             continue
         part = partition_aps(inst)
         res = run_protocol(inst, part, beta=BETA, ubar=utility_scale(inst),
-                           k_accept=K_ACCEPT, rng=np.random.default_rng(1000 + s),
-                           collect=True)
+                           k_accept=K_ACCEPT, shot_budget=SHOT_BUDGET,
+                           rng=np.random.default_rng(1000 + s), collect=True)
         runs.append((100.0 * res["utility"] / opt, s, inst, part, res, opt))
     runs.sort(key=lambda t: t[0])
     return runs[len(runs) // 2], [r[0] for r in runs]
@@ -170,9 +172,10 @@ def panel_zone_law(ax, r, zcol, first):
     ref = r["pref"][rank]
     key = {tuple(int(x) for x in row): t for t, row in enumerate(r["rows"][rank])}
     meas = np.zeros(len(ref))
-    for row in r["codes"]:
-        meas[key[tuple(int(x) for x in row)]] += 1
-    meas /= max(len(r["codes"]), 1)
+    for row, wt in zip(r["codes"], r["weights"]):
+        meas[key[tuple(int(x) for x in row)]] += wt
+    if meas.sum() > 0:
+        meas /= meas.sum()
 
     xs = np.arange(len(ref))
     ax.bar(xs, meas, width=0.9, color=zcol.get(zone.idx, "#888"), alpha=0.85,
@@ -185,10 +188,12 @@ def panel_zone_law(ax, r, zcol, first):
     ax.text(len(ref) + pad * 0.55, ax.get_ylim()[1] * 0.5, "infeasible:\nzero mass",
             fontsize=5.8, color="#c1440e", ha="center", va="center")
     ax.set_xlim(-0.8, len(ref) + pad)
+    back = ("executed at target $\\beta$" if r["beta_z"] >= BETA - 1e-6
+            else f"executed at $\\beta_z$={r['beta_z']:.2f}, reweighted")
     ax.set_title(f"zone Z{zone.idx}: $N_z$={zone.n_ue}, "
                  f"$|\\mathcal{{F}}_z|$={len(ref)}\n"
-                 f"$\\mu_z$={r['mu']:.3f}, "
-                 f"{_count(K_ACCEPT / max(r['mu'], 1e-12))} shots", fontsize=7.5)
+                 f"$\\mu_z$={r['mu']:.3f}, {_count(r['shots'])} shots, "
+                 f"ESS {r['ess']:.0f}/{r['k_eff']}\n{back}", fontsize=7)
     ax.set_xlabel("assignment, ranked by $J_z$", fontsize=7)
     if first:
         ax.set_ylabel("accepted probability", fontsize=8)
@@ -283,7 +288,9 @@ def main():
                  fontsize=11.5, y=0.982)
     fig.text(0.008, 0.028,
              f"g={G}, seed={seed} (median of {len(all_ratios)} seeds by utility "
-             f"ratio); beta={BETA}, K_z={K_ACCEPT}. Utility {res['utility']:.1f} "
+             f"ratio); target beta={BETA}, K_z={K_ACCEPT}, shot budget "
+             f"{SHOT_BUDGET:,}/zone ({res['n_backed_off']} zones executed at a "
+             f"lower beta_z and were reweighted). Utility {res['utility']:.1f} "
              f"of the centralized strict optimum {opt:.1f} = {ratio:.1f}%; the "
              f"assignment is strictly feasible ({res['feasible']}). "
              f"Zone labels in (a): UEs, state qubits, two-qubit gates.",
@@ -303,6 +310,10 @@ def main():
 
     # ---- the same panels again, standalone and separately editable -------
     os.makedirs(PANEL_DIR, exist_ok=True)
+    # clear this script's own panels first: names carry zone and UE indices,
+    # so a changed instance would otherwise leave stale files behind
+    for old in glob.glob(f"{PANEL_DIR}/snapshot_*"):
+        os.remove(old)
     specs = [("snapshot_a_partition", (6.4, 6.4),
               lambda ax: panel_map(ax, inst, part, active, zcol))]
     for j, r in enumerate([active[i] for i in order[:N_ZONE_PANELS]]):

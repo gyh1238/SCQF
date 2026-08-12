@@ -24,22 +24,45 @@ Sec. V-D, counted and reported.
 import numpy as np
 
 from haiq_zone import (build_zone, enumerate_zone, sample_zone,
-                       acceptance_mass, amplification_rounds)
+                       choose_execution_exponent)
 
 
-def _marginal(codes, k, n_val, alpha=0.5):
-    """Boundary marginal of local UE k with Laplace smoothing.
+def _marginal(codes, w, k, n_val, alpha=0.5):
+    """Boundary marginal of local UE k, weighted and Laplace-smoothed.
 
     Smoothing matters because a zero is a finite-sample statement, not a
     statement that the value is infeasible; a hard zero would veto a value
-    that another zone strongly supports.
+    that another zone strongly supports.  The weights are the reconstruction
+    weights of Sec. IV-C: they are all equal when the zone executed at the
+    target exponent, and unequal when it had to back off.
     """
-    c = np.bincount(codes[:, k], minlength=n_val).astype(float)
+    c = np.bincount(codes[:, k], weights=w, minlength=n_val).astype(float)
     return (c + alpha) / (c.sum() + alpha * n_val)
 
 
-def run_protocol(inst, part, beta, ubar, k_accept=400, k_min=40, rng=None,
-                 collect=False, max_attempts=4):
+def _ess(w):
+    """Effective sample size of a weighted list: (sum w)^2 / sum w^2."""
+    if len(w) == 0:
+        return 0.0
+    s1 = float(w.sum())
+    s2 = float((w ** 2).sum())
+    return s1 * s1 / s2 if s2 > 0 else 0.0
+
+
+def _weights(util, d_lambda, n_target):
+    """Reconstruction weights exp[(lambda - lambda_z) J_z], scaled so that
+    they sum to the sample count; that keeps the Laplace smoothing above on
+    the same scale whether or not the zone backed off."""
+    if len(util) == 0:
+        return np.zeros(0)
+    lw = d_lambda * np.asarray(util, dtype=float)
+    w = np.exp(lw - lw.max())
+    s = w.sum()
+    return w * (n_target / s) if s > 0 else np.ones(len(w))
+
+
+def run_protocol(inst, part, beta, ubar, k_accept=200, k_min=25,
+                 shot_budget=10_000, rng=None, collect=False, max_attempts=4):
     """
     Run the local stage and the coordination stage.
 
@@ -53,7 +76,8 @@ def run_protocol(inst, part, beta, ubar, k_accept=400, k_min=40, rng=None,
     rng = rng or np.random.default_rng(0)
     last = None
     for attempt in range(max_attempts):
-        res = _run_once(inst, part, beta, ubar, k_accept, k_min, rng, collect)
+        res = _run_once(inst, part, beta, ubar, k_accept, k_min,
+                        shot_budget, rng, collect)
         res["attempts"] = attempt + 1
         last = res
         if res["feasible"]:
@@ -61,27 +85,32 @@ def run_protocol(inst, part, beta, ubar, k_accept=400, k_min=40, rng=None,
     return last
 
 
-def _run_once(inst, part, beta, ubar, k_accept, k_min, rng, collect):
+def _run_once(inst, part, beta, ubar, k_accept, k_min, shot_budget, rng,
+              collect):
     """One local stage followed by one coordination pass."""
     lam = beta / ubar
 
     # ---------------- local stage: one sampling stage per zone -----------
+    # Each zone executes at the largest exponent its own shot budget allows
+    # and records J_z per draw; the target exponent is restored afterwards by
+    # reweighting, so no zone is forced to run at an exponent it cannot pay
+    # for and no zone dictates the exponent used for the merge.
     zones, reports = [], []
     for z in range(part.n_zones):
         zone = build_zone(inst, part, z)
         if zone.n_ue == 0:
             continue
-        rows, pref, uref = enumerate_zone(zone, lam)         # exact zone law
-        mu = acceptance_mass(zone, lam)
-        k_rounds = amplification_rounds(mu)
-        p_acc = np.sin((2 * k_rounds + 1) * np.arcsin(np.sqrt(max(mu, 1e-12)))) ** 2
-        codes, util, mu_hat, draws = sample_zone(zone, lam, k_accept, rng)
+        rows, pref, uref = enumerate_zone(zone, lam)         # exact target law
+        beta_z, mu_z, shots, k_eff = choose_execution_exponent(
+            zone, beta, ubar, k_accept, shot_budget)
+        lam_z = beta_z / ubar
+        codes, util, mu_hat, draws = sample_zone(zone, lam_z, k_eff, rng)
+        w = _weights(util, lam - lam_z, max(len(util), 1))
         zones.append(zone)
         reports.append(dict(zone=zone, rows=rows, pref=pref, uref=uref,
-                            mu=mu, mu_hat=mu_hat, rounds=k_rounds,
-                            p_acc=p_acc, codes=codes, util=util,
-                            shots_quantum=k_accept / max(p_acc, 1e-12),
-                            draws_classical=k_accept / max(mu, 1e-12)))
+                            beta_z=beta_z, mu=mu_z, mu_hat=mu_hat,
+                            codes=codes, util=util, weights=w,
+                            k_eff=k_eff, shots=shots, ess=_ess(w)))
 
     # ---------------- boundary bookkeeping -------------------------------
     # A UE keeps the same full candidate domain in every zone (full-domain
@@ -93,6 +122,8 @@ def _run_once(inst, part, beta, ubar, k_accept, k_min, rng, collect):
     bnd = [i for i, hs in holders.items() if len(hs) > 1]
 
     base = [rep["codes"].copy() for rep in reports]   # retained draws per zone
+    base_w = [rep["weights"].copy() for rep in reports]   # their target-exponent weights
+    base_u = [rep["util"].copy() for rep in reports]      # J_z of each draw
     feas = [rep["rows"] for rep in reports]           # exact F_z per zone
 
     committed = {}
@@ -125,16 +156,17 @@ def _run_once(inst, part, beta, ubar, k_accept, k_min, rng, collect):
         return bool(m.any())
 
     def conditioned(ri):
-        """Retained draws of zone `ri` consistent with the current commitments."""
+        """Retained draws of zone `ri` consistent with the current commitments,
+        with their reconstruction weights and local utilities."""
         zone = reports[ri]["zone"]
         rows = base[ri]
         if len(rows) == 0:
-            return rows
+            return rows, base_w[ri], base_u[ri]
         m = np.ones(len(rows), dtype=bool)
         for kk in range(zone.n_ue):
             if zone.ue[kk] in committed:
                 m &= rows[:, kk] == committed[zone.ue[kk]]
-        return rows[m]
+        return rows[m], base_w[ri][m], base_u[ri][m]
 
     bnd_set = set(bnd)
 
@@ -203,9 +235,10 @@ def _run_once(inst, part, beta, ubar, k_accept, k_min, rng, collect):
                 n_val = len(inst.cand[i])
                 b = np.ones(n_val)
                 for ri, k in holders[i]:
-                    if len(kept[ri]) == 0:
+                    ck, wk, _ = kept[ri]
+                    if len(ck) == 0:
                         continue
-                    b *= _marginal(kept[ri], k, n_val)
+                    b *= _marginal(ck, wk, k, n_val)
                 b = b / b.sum()
                 conf = float(b.max())
                 if conf > best_conf:
@@ -226,12 +259,17 @@ def _run_once(inst, part, beta, ubar, k_accept, k_min, rng, collect):
             level += 1
             # exception stage: a zone whose conditioned list ran short is re-drawn
             for ri, _ in holders[i]:
-                if len(conditioned(ri)) < k_min:
-                    zone = reports[ri]["zone"]
-                    new, _, _, _ = sample_zone(zone, lam, k_accept, rng,
-                                               pinned=zone_pins(ri))
+                ck, wk, _ = conditioned(ri)
+                if _ess(wk) < k_min:
+                    rep = reports[ri]
+                    zone = rep["zone"]
+                    lam_z = rep["beta_z"] / ubar
+                    new, new_u, _, _ = sample_zone(zone, lam_z, rep["k_eff"],
+                                                   rng, pinned=zone_pins(ri))
                     if len(new):
                         base[ri] = new
+                        base_u[ri] = new_u
+                        base_w[ri] = _weights(new_u, lam - lam_z, max(len(new_u), 1))
                         exceptions += 1
         else:
             # this variable is exhausted: withdraw it and re-try the previous
@@ -251,20 +289,24 @@ def _run_once(inst, part, beta, ubar, k_accept, k_min, rng, collect):
             trace.append(dict(ue=u, belief=b, value=committed[u], conf=c))
 
     # ---------------- final assembly -------------------------------------
+    # A zone resolves its interior from the draws it actually holds, not from
+    # an enumeration of F_z: with a shot budget it never sees the whole
+    # feasible set, and pretending otherwise would hide the cost of the
+    # budget.  A zone left with nothing consistent re-runs once with the
+    # boundary pinned, which is the same exception stage used above.
     assign = {}
+    final_resamples = 0
     for ri, rep in enumerate(reports):
         zone = rep["zone"]
-        rows = feas[ri]
-        m = np.ones(len(rows), dtype=bool)
-        for k in range(zone.n_ue):
-            if zone.ue[k] in committed:
-                m &= rows[:, k] == committed[zone.ue[k]]
-        cand_rows = rows[m]
+        cand_rows, _, cand_u = conditioned(ri)
+        if len(cand_rows) == 0:
+            lam_z = rep["beta_z"] / ubar
+            cand_rows, cand_u, _, _ = sample_zone(zone, lam_z, rep["k_eff"],
+                                                  rng, pinned=zone_pins(ri))
+            final_resamples += 1
         if len(cand_rows) == 0:
             continue
-        util = np.array([sum(zone.uloc[k][c[k]] for k in range(zone.n_ue))
-                         for c in cand_rows])
-        pick = cand_rows[int(np.argmax(util))]
+        pick = cand_rows[int(np.argmax(cand_u))]
         for k in range(zone.n_ue):
             i = zone.ue[k]
             if i in committed:
@@ -295,15 +337,17 @@ def _run_once(inst, part, beta, ubar, k_accept, k_min, rng, collect):
         zone = rep["zone"]
         w = sum(max(1, int(np.ceil(np.log2(len(zone.cand[k])))))
                 for k in zone.boundary_local)
-        bits += k_accept * (w + 32)          # codes + one utility scalar per draw
-    shots_q = sum(r["shots_quantum"] for r in reports)
-    draws_c = sum(r["draws_classical"] for r in reports)
+        bits += rep["k_eff"] * (w + 32)      # codes + one utility scalar per draw
 
     out = dict(utility=util_total, feasible=ok_global, assign=assign,
-               n_boundary=len(bnd), exceptions=exceptions, backtracks=backtracks,
-               aborted=aborted,
-               comm_bits=bits, shots_quantum=shots_q, draws_classical=draws_c,
-               max_rounds=max((r["rounds"] for r in reports), default=0),
+               n_boundary=len(bnd), exceptions=exceptions,
+               final_resamples=final_resamples, backtracks=backtracks,
+               aborted=aborted, comm_bits=bits,
+               shots_max=max((r["shots"] for r in reports), default=0.0),
+               shots_total=sum(r["shots"] for r in reports),
+               beta_min=min((r["beta_z"] for r in reports), default=beta),
+               n_backed_off=sum(1 for r in reports if r["beta_z"] < beta - 1e-6),
+               ess_min=min((r["ess"] for r in reports), default=0.0),
                mu_min=min((r["mu"] for r in reports), default=1.0),
                n_active_zones=len(reports))
     if collect:
@@ -331,4 +375,5 @@ if __name__ == "__main__":
         print(f"g={g} UEs={inst.n_ue:3d} zones={res['n_active_zones']:2d} "
               f"|B|={res['n_boundary']:3d}  J={res['utility']:.1f}/{opt:.1f} "
               f"= {100*res['utility']/opt:.1f}%  feasible={res['feasible']}  "
-              f"exc={res['exceptions']}  maxk={res['max_rounds']}")
+              f"shots<={res['shots_max']:.0f}  backed off={res['n_backed_off']} "
+              f"(beta>={res['beta_min']:.2f})  ESS>={res['ess_min']:.0f}")
