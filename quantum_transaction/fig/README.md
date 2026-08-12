@@ -20,10 +20,10 @@ Panels:
 | file | panel |
 |---|---|
 | `panels/snapshot_a_partition.*` | (a) the partition |
-| `panels/snapshot_b1_zone_law_Z7.*` | (b1) zone Z7 accepted law |
-| `panels/snapshot_b2_zone_law_Z6.*` | (b2) zone Z6 accepted law |
-| `panels/snapshot_b3_zone_law_Z5.*` | (b3) zone Z5 accepted law |
-| `panels/snapshot_b4_zone_law_Z4.*` | (b4) zone Z4 accepted law |
+| `panels/snapshot_b1_zone_law_Z7.*` | (b1) zone Z7, 2 APs |
+| `panels/snapshot_b2_zone_law_Z9.*` | (b2) zone Z9, 1 AP |
+| `panels/snapshot_b3_zone_law_Z2.*` | (b3) zone Z2, 3 APs |
+| `panels/snapshot_b4_zone_law_Z1.*` | (b4) zone Z1, 3 APs |
 | `panels/snapshot_c1_joint_Z10_UE38_40.*` | (c1) joint vs. marginals, zone Z10 |
 | `panels/snapshot_c2_joint_Z9_UE25_38.*` | (c2) joint vs. marginals, zone Z9 |
 | `panels/snapshot_c3_ablation_joint_vs_marginals.*` | (c3) what dropping the joint list costs |
@@ -216,7 +216,9 @@ draws instead of one marginal per boundary UE — in two steps.
 **(c1), (c2): what marginals lose.** The two zones whose boundary UEs are most
 strongly coupled, each for its most dependent pair.
 
-- **x**: the four joint choices the two UEs can make, labelled by RB.
+- **x**: the four joint choices the two UEs can make, labelled by RB and
+  ordered by the joint report, largest first. The impossible combination
+  therefore lands last, where its bar is easiest to compare against nothing.
 - **solid bars**: the zone's joint report, restricted to that pair.
 - **hatched bars**: the outer product of that zone's own marginals — what a
   marginal or preference exchange would reconstruct.

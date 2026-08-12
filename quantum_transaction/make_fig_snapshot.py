@@ -211,6 +211,33 @@ def panel_map(ax, inst, part, active, zcol):
         title_fontsize=7.5, alignment="left")
 
 
+def pick_zone_panels(active, n):
+    """Zones for the (b) row, chosen to span the range rather than repeat it.
+
+    Taking the n largest feasible sets picks four zones that happen to be the
+    same size, which says nothing about how the partition varies.  This walks
+    |F_z| downwards, takes each distinct value once, and within a tie prefers
+    the AP count that has appeared least -- so the row shows a one-AP zone
+    beside a three-AP one, and a wide feasible set beside a narrow one.
+    """
+    cand = sorted(active, key=lambda r: -len(r["rows"]))
+    chosen, seen, ap_seen = [], set(), {}
+    for r in cand:
+        f = len(r["rows"])
+        if f in seen:
+            continue
+        peers = sorted((q for q in cand if len(q["rows"]) == f),
+                       key=lambda q: (ap_seen.get(len(q["zone"].aps), 0),
+                                      len(q["zone"].aps)))
+        pick = peers[0]
+        chosen.append(pick)
+        seen.add(f)
+        ap_seen[len(pick["zone"].aps)] = ap_seen.get(len(pick["zone"].aps), 0) + 1
+        if len(chosen) == n:
+            break
+    return chosen
+
+
 def panel_zone_law(ax, r, zcol, first):
     """(b) accepted law of one zone against the exact Gibbs reference."""
     zone = r["zone"]
@@ -234,8 +261,10 @@ def panel_zone_law(ax, r, zcol, first):
     ax.text(len(ref) + pad * 0.55, ax.get_ylim()[1] * 0.5, "infeasible:\nzero mass",
             fontsize=5.8, color="#c1440e", ha="center", va="center")
     ax.set_xlim(-0.8, len(ref) + pad)
-    ax.set_title(f"zone Z{zone.idx}: $N_z$={zone.n_ue}, "
-                 f"$|\mathcal{{F}}_z|$={len(ref)}", fontsize=FS_TITLE)
+    n_ap = len(zone.aps)
+    ax.set_title(f"zone Z{zone.idx}: {n_ap} AP{'' if n_ap == 1 else 's'}, "
+                 f"$N_z$={zone.n_ue}, $|\mathcal{{F}}_z|$={len(ref)}",
+                 fontsize=FS_TITLE)
     ax.set_xlabel("assignment, ranked by $J_z$", fontsize=FS_LABEL)
     if first:
         ax.set_ylabel("accepted probability", fontsize=FS_LABEL)
@@ -299,6 +328,10 @@ def panel_boundary(ax, item, inst, reports, zcol, first):
     bad = np.array([not ((rows[:, ka] == x) & (rows[:, kb] == y)).any()
                     for x, y in combos])
 
+    order = np.argsort(-jv)                    # largest joint bar first
+    combos = [combos[i] for i in order]
+    jv, pv, bad = jv[order], pv[order], bad[order]
+
     ax.bar(xs - 0.19, jv, width=0.36, color=_tint(zcol.get(zone.idx, "#888"), 0.95),
            label="joint report")
     ax.bar(xs[~bad] + 0.19, pv[~bad], width=0.36, facecolor="none",
@@ -309,10 +342,12 @@ def panel_boundary(ax, item, inst, reports, zcol, first):
     top = max(jv.max(), pv.max())
     ax.set_ylim(0, top * 1.42)                     # headroom for the key
     for i in np.where(bad)[0]:
+        # the sorted order puts these last, so keep the label off the frame
+        edge = i == len(combos) - 1
         ax.annotate("impossible,\nyet backed", (i + 0.19, pv[i]),
-                    textcoords="offset points", xytext=(0, 4), ha="center",
-                    va="bottom", fontsize=FS_LEGEND, color="#c1440e",
-                    linespacing=0.95)
+                    textcoords="offset points", xytext=(6 if edge else 0, 4),
+                    ha="right" if edge else "center", va="bottom",
+                    fontsize=FS_LEGEND, color="#c1440e", linespacing=0.95)
 
     ax.set_title(f"zone Z{zone.idx}, boundary UEs {ua} & {ub}", fontsize=FS_TITLE)
     ax.set_xticks(xs)
@@ -430,8 +465,8 @@ def main():
 
     panel_map(fig.add_subplot(gs[:, 0]), inst, part, active, zcol)
 
-    order = np.argsort([-len(r["rows"]) for r in active])
-    for j, r in enumerate([active[i] for i in order[:N_ZONE_PANELS]]):
+    zone_panels = pick_zone_panels(active, N_ZONE_PANELS)
+    for j, r in enumerate(zone_panels):
         panel_zone_law(fig.add_subplot(gs[0, 1 + j]), r, zcol, j == 0)
 
     pairs = [(ri, best) for ri, rep in enumerate(reports)
@@ -463,7 +498,7 @@ def main():
         os.remove(old)
     specs = [("snapshot_a_partition", (6.4, 6.4),
               lambda ax: panel_map(ax, inst, part, active, zcol))]
-    for j, r in enumerate([active[i] for i in order[:N_ZONE_PANELS]]):
+    for j, r in enumerate(zone_panels):
         specs.append((f"snapshot_b{j+1}_zone_law_Z{r['zone'].idx}", (4.2, 3.2),
                       lambda ax, r=r: panel_zone_law(ax, r, zcol, True)))
     for j, item in enumerate(pairs):
