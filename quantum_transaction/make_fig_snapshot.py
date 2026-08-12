@@ -326,9 +326,9 @@ def panel_order(ax, res):
     ax.set_xlabel("boundary UE, in decimation order", fontsize=7)
     ax.set_ylabel(r"confidence $\max_v b_i(v)$", fontsize=7.5)
     n_exc = res["exceptions"]
-    ax.set_title(f"each boundary UE fixed once,\nleast ambiguous first "
-                 f"({n_exc} exception re-sample{'' if n_exc == 1 else 's'})",
-                 fontsize=7.5)
+    ax.set_title(f"each boundary UE fixed once, least\n"
+                 f"ambiguous first  ·  {n_exc} re-sample"
+                 f"{'' if n_exc == 1 else 's'}", fontsize=7.5)
     ax.grid(alpha=0.3, lw=0.5)
     ax.tick_params(labelsize=6.5)
 
