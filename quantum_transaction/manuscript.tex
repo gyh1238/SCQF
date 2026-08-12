@@ -1,0 +1,1336 @@
+\documentclass[journal]{IEEEtran}
+\usepackage{amsmath,amssymb,amsfonts,amsthm}
+\usepackage{algorithm, algorithmic}
+\usepackage{setspace}
+\usepackage{array}
+\usepackage{textcomp}
+\usepackage{stfloats}
+\usepackage{url}
+\usepackage{verbatim}
+\usepackage{graphicx}
+\usepackage{cite}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+\usepackage{subcaption}
+\usepackage{multirow}
+\usepackage{bm}
+\usepackage{booktabs}
+
+\usepackage{bbm}
+
+\newtheorem{proposition}{Proposition}
+\newtheorem{remark}{Remark}
+\newtheorem{definition}{Definition}
+
+% -- notation macros (global consistency; audit against code) --
+\newcommand{\calC}{\mathcal{C}}  % local circuit (operator chain)
+\newcommand{\calF}{\mathcal{F}}  % feasible set
+\newcommand{\calV}{\mathcal{V}}  % valid code set
+\newcommand{\calU}{\mathcal{U}}  % UE set
+\newcommand{\calZ}{\mathcal{Z}}  % zone set
+\newcommand{\calB}{\mathcal{B}}  % boundary UE set
+\newcommand{\calA}{\mathcal{A}}  % AP set
+\newcommand{\calR}{\mathcal{R}}  % RB set
+\newcommand{\calS}{\mathcal{S}}  % retained boundary sample list
+\newcommand{\calP}{\mathcal{P}}  % preparation operator
+\newcommand{\calO}{\mathcal{O}}  % oracle operator
+\newcommand{\calE}{\mathcal{E}}  % constraint-evaluation operator
+\newcommand{\calD}{\mathcal{D}}  % amplification reflection
+\newcommand{\calG}{\mathcal{G}}  % one amplification round
+\newcommand{\ind}[1]{\mathbbm{1}\left\{#1\right\}}
+\newcommand{\ket}[1]{\lvert #1 \rangle}
+\newcommand{\bra}[1]{\langle #1 \rvert}
+% -- fixed-width column types for Table I (needs array) --
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\graphicspath{{./figures/}}
+% -- compile-safe figure placeholders (draft; replace with real art) --
+\newcommand{\figph}[2][6cm]{%
+ \setlength{\fboxsep}{8pt}%
+ \fbox{\parbox[c][#1][c]{0.93\linewidth}{\centering\itshape #2}}%
+}
+
+% Target journal candidates
+% IEEE Transactions on Network Science and Engineering
+
+\begin{document}
+
+% \title{A}
+\title{Toward Scalable Quantum Network Management: Unified Formulation, Oracle Design, and Distributed Coordination}
+
+\author{
+ Yong Hun Jang and Sang Hyun Lee
+ \thanks{
+ All authors are with the School of Electrical Engineering, Korea University, Seoul 02841, Korea (e-mail:\{disclose, sanghyunlee\}@korea.ac.kr)}
+ % FIXME(submission): "disclose" is a placeholder. Insert the real address.
+}
+
+\maketitle
+
+{\color{violet}
+\begin{abstract}
+This paper presents unified modeling, oracle design, and distributed coordination toward universal quantum network management. Diverse network management tasks are represented within a common assignment optimization model. This representation provides a unified quantum design for heterogeneous objectives and resource constraints. Existing quantum optimization methods enforce assignment constraints through penalty formulations. Thus, the measured solutions are not guaranteed to satisfy the original constraints, and their objective values depend on penalty selection. he proposed quantum oracle directly encodes the original objective function and assignment constraints. Every accepted assignment therefore satisfies the original constraints, and its utility is evaluated without penalty distortion. Since current noisy intermediate-scale quantum processors cannot accommodate practical network instances within a single circuit, the proposed design partitions large optimization problems into coordinated local quantum computations and reconstructs globally consistent assignments through lightweight boundary coordination. The complete architecture is implemented for joint access-point and resource-block assignment and evaluated through noise-free simulation, noisy simulation, quantum hardware execution, and distributed protocol evaluation. The results confirm exact constraint satisfaction, accurate distribution reconstruction, scalable coordination, and practical execution on present-day quantum platforms, establishing a scalable computational foundation toward universal quantum network management.
+
+
+% This paper develops a hybrid quantum-classical method for joint access-point (AP) and resource-block (RB) assignment under strict feasibility. An RB choice is the actual decision and simultaneously determines the serving AP, so UE validity, RB access limits, and AP admission limits must be enforced on the same assignment. The local quantum circuit does not merely identify one preferred assignment. It prepares a utility-weighted joint distribution over strictly feasible local assignments, with exponential amplitude weights that preserve the ordering of the original additive utility. The network is then factorized into zones coupled only by copies of their boundary UEs. Marginalizing each local joint distribution gives an exact boundary distribution, and each zone reports retained boundary joint samples from one local sampling stage producing $K_z$ accepted draws. Confidence-ordered decimation then fixes the boundary UEs one at a time, conditioning the retained joint samples after each irreversible decision and thereby propagating their correlations, so a zone report is produced once and carried unchanged through the classical stage; only a zone whose conditioned sample list becomes insufficient is re-sampled. This construction separates exact local feasibility and exact boundary reduction from the finite-shot and commitment heuristics used to select one globally consistent assignment.
+\end{abstract}
+\begin{IEEEkeywords}
+Quantum computing, network management, assignment optimization, oracle design, distributed coordination, hybrid quantum-classical computing
+%Quantum computing, joint AP-RB assignment, factor graphs, boundary marginalization, strict feasibility, hybrid quantum-classical optimization
+\end{IEEEkeywords}
+\section{Introduction}
+\label{sec:intro}
+Modern wireless networks are evolving from communication infrastructures into programmable systems that integrate communication, computation, and control across increasingly heterogeneous services \cite{1}. Human-centric applications, massive machine-type communications, and emerging intelligent services continue to diversify network operation \cite{1,2}. At the same time, network functions are moving from dedicated hardware toward programmable software platforms that adapt to changing traffic conditions, wireless environments, and service requirements \cite{2,3}. Network management has consequently evolved from static configuration of communication equipment into continuous optimization of the network operation \cite{2,4}. The computational capability supporting these operations has become as important as the communication capability itself for sustaining the network performance \cite{1,4}.
+
+Despite their diverse objectives, many network management functions can be interpreted within a common assignment framework. User association, radio resource allocation, traffic scheduling, task offloading, service placement, and network slicing all determine how limited resources are assigned while satisfying connectivity, capacity, and service constraints \cite{5,6}. Their objectives differ across applications. User association establishes the network connectivity, resource allocation improves the link performance, and task offloading balances communication and computing costs \cite{6,7,8}. Nevertheless, they all seek feasible assignments that maximize the network utility under finite resource availability. This shared mathematical structure extends across a broad class of network management tasks \cite{5,6}.
+
+Such assignment problems are rarely solved in isolation. Network-wide control determines long-term infrastructure configurations, whereas local controls continuously manage regional radio resources according to instantaneous channel conditions, traffic demands, and service requests \cite{4,9}. These two levels remain tightly coupled throughout the network operation. Infrastructure-level solutions define the feasible operating region of local optimization, while local resource utilization influences subsequent network-wide operation \cite{5,9}. Practical network management therefore depends on coordinated optimization across interconnected computational tasks rather than independent optimization of individual functions \cite{5,9}.
+
+Network scale makes this hierarchical coordination increasingly difficult. The number of feasible configurations grows combinatorially with the number of network entities, candidate connections, and available resources \cite{5}. Centralized optimization demands global information and rapidly increasing computational resources. Distributed operation reduces this burden but introduces another challenge: independently computed local solutions remain globally consistent while exchanging only limited information \cite{9,10}. Future network management calls for a computational architecture that scales with network size while preserving network-wide consistency.
+
+Existing computational approaches satisfy only part of these requirements. Classical optimization provides mathematically rigorous solutions for network management, but its computational cost increases rapidly with network size and resource connectivity \cite{11,12}. Practical implementations often rely on approximated algorithms and heuristics to maintain acceptable execution times \cite{12,13}. Artificial intelligence and machine learning have greatly improved network automation through traffic prediction, interference management, mobility optimization, and adaptive resource provisioning \cite{2,14}. Their strength lies in learning statistical behaviors from historical observations rather than determining optimal resource configurations for each instantaneous network state \cite{14,15}. However, scalable optimization of large-scale network management poses an open challenge.
+
+Quantum computing offers a fundamentally different computational model based on quantum superposition that enables simultaneous evaluation of many candidate configurations \cite{16,17}. Recent advances in quantum hardware and algorithms have stimulated growing interest in quantum-assisted communication systems and network management \cite{18,19}. Quantum search algorithms, variational optimization, and QUBO-based formulations have demonstrated promising results for routing, scheduling, resource allocation, and related combinatorial challenges \cite{17,20,21,22}. These developments establish quantum computing as a promising computational platform for future network management.
+
+Practical network management imposes additional requirements beyond computational acceleration. The original optimization problem should remain intact throughout quantum execution so that operational constraints are enforced directly and the original network utility is evaluated without auxiliary reformulation. Existing quantum optimization methods do not satisfy these conditions simultaneously. Penalty-based formulations network constraints indirectly through modified objective functions. Thus, measured solutions are not guaranteed to satisfy the original constraints and their objective values depend on the selected penalizing parameters \cite{20,21}. In addition, present-day noisy intermediate-scale quantum (NISQ) processors restrict executable problem sizes, preventing large-scale network optimization within a single quantum circuit \cite{18,23}.
+These limitations call for a different computational design. The challenge is no longer developing another quantum optimization algorithm. It is establishing a scalable quantum computing framework that preserves the original optimization model and supports distributed execution for large-scale network management.
+
+This work develops a scalable computational architecture for quantum network management. The proposed architecture is organized as a coherent design flow rather than a collection of independent algorithmic components. It begins with a unified formulation that captures heterogeneous network management tasks within a common optimization model. A formulation-driven quantum oracle directly represents the original optimization model without penalty reformulation. Distributed coordination extends the computation beyond individual NISQ processors through coordinated local quantum computation and lightweight boundary coordination.
+
+The proposed design preserves the original optimization problem throughout the computational pipeline. The optimization model is translated directly into quantum computation, so that the original constraints and objective function remain unchanged. Large optimization problems are further decomposed into coordinated local quantum computations and reconstructed through lightweight distributed coordination. This enables scalable execution beyond the capacity of individual quantum processors.
+
+The complete design is implemented in Qiskit and evaluated through ideal simulation, noisy simulation, quantum hardware execution, distributed protocol evaluation, and resource-scaling analysis. These evaluations validate the proposed computational pipeline and demonstrate its practical feasibility on present-day quantum platforms.
+
+The main contributions of this paper are summarized as follows.
+
+\begin{itemize}
+\item \textbf{Unified formulation for assignment-based network management.}
+A computational architecture is developed for network management problems sharing a common assignment structure. The proposed design connects unified problem formulation, quantum oracle construction, and distributed execution within a single computational framework.
+
+\item \textbf{Formulation-driven quantum computation.}
+The proposed oracle is constructed directly from the original optimization model without penalty reformulation. The resulting computation preserves the original objective function while guaranteeing strict feasibility of every accepted solution.
+
+\item \textbf{Scalable execution architecture.}
+Network optimization problems are partitioned into coordinated local quantum computations connected through lightweight boundary coordination. The proposed execution strategy extends computation beyond the capacity of individual NISQ processors while maintaining globally consistent solutions.
+
+\item \textbf{End-to-end implementation and validation.}
+The complete computational design is implemented in Qiskit and validated through simulation, quantum hardware execution, distributed protocol evaluation, and resource-scaling analysis. The corresponding results demonstrate practical feasibility on present-day quantum computing platforms.
+\end{itemize}
+
+The remainder of this paper is organized as follows. Section~\ref{sec:background} reviews related quantum optimization methods for network management and discusses the requirements for scalable quantum computation. Section~\ref{sec:formulation} introduces the unified optimization formulation. Section~\ref{sec:circuit} presents the formulation-driven quantum oracle design. Section~\ref{sec:hybrid} develops the distributed execution framework, including problem factorization and boundary coordination. Section~\ref{sec:eval} reports implementation and experimental validation through simulation, quantum hardware execution, and resource-scaling analysis.
+
+
+% Wireless resource administration is often written as two consecutive decisions: UE-AP association followed by RB allocation. In the operational system, the decisions are coupled. Selecting an RB identifies its owner AP, while the same selection consumes both an RB-level opportunity and one unit of AP admission capacity. A realizable assignment must therefore satisfy three strict conditions on a single decision: every UE chooses exactly one candidate RB, no RB is used beyond its access limit, and no AP serves more UEs than its admission limit. Treating the two levels independently can produce individually valid decisions that cannot coexist.
+
+% Quantum search offers a mechanism for evaluating many assignments in superposition, but two issues are decisive for this problem. First, penalty-based QUBO and variational formulations do not ensure that every reported assignment satisfies all protocol constraints. Second, a product of per-UE controlled-rotation weights is not automatically equivalent to the additive objective $\sum_i\sum_r u_{i,r}y_{i,r}$: an arbitrary monotone transform applied before multiplication can reverse the ranking of complete assignments. The objective pathway must therefore be calibrated at the configuration level, and the circuit output must be characterized as a conditional joint distribution rather than only as ``high-utility amplitudes.''
+
+% Network scale introduces a separate coordination problem. APs and RBs are owned by zones, whereas UEs covered by several zones appear as shared variables. The resulting factorization contains owner-local strict-feasibility factors and equality factors that identify the copies of every boundary UE. The complete contribution of a zone is therefore its utility-weighted joint distribution over the boundary UEs it shares, not a single local optimum or a scalar preference. HAIQ obtains this distribution independently in each zone through one local sampling stage producing $K_z$ accepted draws. Each zone report depends on that zone alone and is carried unchanged into the coordination stage. All subsequent coordination is classical: confidence-ordered decimation over the retained joint samples.
+
+% Our earlier constrained quantum framework (CQF) \cite{jang2025cqf} supplied the local screen-and-comparison architecture. This paper revises and extends that architecture in four respects.
+% \begin{itemize}
+%  \item \textbf{Joint strict system model.} The RB variable is the actual decision, while the AP association is derived from the owner of the selected RB. UE validity, RB access, and AP admission are consequently enforced in one optimization model and can be violated simultaneously.
+%  \item \textbf{Objective-order-preserving amplitude encoding.} A controlled-$R_Y$ gate encodes an exponential utility-loss factor. The product of the per-UE factors is proportional to the exponential of the additive zone utility, and therefore preserves the exact ordering of complete local assignments.
+%  \item \textbf{Strict local joint distribution.} A single superflag marks only states satisfying every local validity and capacity constraint. Conditional measurement yields a normalized, utility-weighted joint distribution over strictly feasible local assignments rather than a lone point solution.
+%  \item \textbf{Exact boundary reduction and finite commitment.} Internal variables are marginalized exactly to obtain each zone's boundary joint distribution. One distribution-valued report per zone is then converted into a globally consistent boundary assignment by confidence-ordered sequential decimation. Finite-shot estimation and irreversible commitment are the heuristic elements; the factorization and boundary reduction are exact.
+%  \item \textbf{Composability as a design constraint.} The local amplitude weights and the inter-zone merge rule are not two independent choices. Both require a product of independent factors to represent an additive objective, and the exponential family is the only weight family that meets this requirement at either level. The requirement is fixed by the classical decomposition before any solver is named, so the circuit is built to realize the local law that the pipeline demands rather than the pipeline being fitted to whatever the circuit happens to produce.
+% \end{itemize}
+
+% The remainder of the paper is organized as follows. Section~\ref{sec:background} states the solver requirements and positions the work against related quantum approaches. Section~\ref{sec:formulation} presents the joint system model and its exact zone factorization. Section~\ref{sec:circuit} develops the zone-local quantum circuit, including register encoding, objective-preserving amplitude weights, strict-feasibility marking, and the induced local distribution. Section~\ref{sec:hybrid} derives the exact boundary law and the decimation that turns it into one assignment. Section~\ref{sec:eval} describes implementation, validation, and resource scaling. Appendix~\ref{app:exponential} establishes that the exponential weight is forced rather than chosen, Appendix~\ref{app:boundary-proof} derives the boundary reduction, and Appendix~\ref{app:decimation} states the decimation step by step.
+
+% =====================================================================
+\section{Background and Related Work}
+\label{sec:background}
+
+Quantum computing has been investigated for network optimization problems including routing, scheduling, and resource allocation \cite{17,20,21,22}. Many of these problems share an assignment structure despite differences in objectives and resource constraints \cite{5,6}. 
+A unified quantum design can express such heterogeneous assignment problems through a common computational structure while preserving original objectives and constraints. Practical network instances can also exceed the capacity of a single quantum processor. requiring coordination among smaller quantum
+computations. Existing quantum approaches differ in how they address these formulation and scalability requirements.
+
+\subsection{Assignment-based network management}
+\label{sec:bg-assignment}
+
+Network management involves the allocation of communication, radio, and computing resources together with the configuration of network connectivity \cite{5,6}. These tasks can be mostly described as assignment problems, where network demands are matched with a finite set of available radio resources and service options. In practice, user equipment (UEs), traffic flows, computing tasks, and service requests can be assigned to access points (APs), radio resource blocks (RBs), computing nodes, routes, and service locations. Each possible assignment contributes a network cost or utility, and the optimization selects a configuration that maximizes the overall network utility under connectivity, capacity, and service constraints \cite{5,6,24}. This common structure covers heterogeneous network management tasks within a unified assignment formulation.
+
+This structure can be organized at inter-cell and intra-cell levels according to the scope of resource management \cite{24}. At the inter-cell level, UEs are associated with APs according to link availability, service demands, and AP access limits. At the intra-cell level, RBs are allocated among UEs within an AP coverage area according to resource availability and link utility. These two levels differ in what is assigned and which constraints are imposed, but both determine a utility-maximizing mapping under finite resource availability. More sophisticated network management tasks extend the same structure to different assignment targets, objectives, and resource constraints.
+
+A valid assignment satisfies all associated constraints. Link availability, resource capacity, and service requirements restrict the admissible configurations, and their intersection defines the feasible set. Since a configuration satisfying one constraint can violate another, the constraints cannot be resolved independently. Exhaustive enumeration can identify feasible configurations, but the number of candidates grows rapidly with the network size and the number of available choices. The assignment optimization seeks high-utility solutions within this common feasible set.
+
+\subsection{Quantum approaches to assignment optimization}
+\label{sec:bg-quantum}
+
+Quantum computing represents information using qubits so that their superposed states encode multiple computational configurations \cite{16,17}. In assignment optimization, basis states correspond to candidate assignments, and Hadamard gates can initialize $q$ state qubits in a uniform superposition over $2^q$ possible assignments. Quantum operations modify their amplitudes according to objective and constraint conditions, and measurement produces assignments according to the resulting state probabilities. Different quantum approaches use these operations for combinatorial optimization, including quantum search,
+quantum annealing, variational algorithms, and quantum learning \cite{17,20,21,22}.
+
+Quantum search algorithms (QSAs) use an oracle to identify desired candidates within the superposed states \cite{nielsen2011}. The oracle marks the corresponding states, and diffusion increases their amplitudes relative to the others. Repeated oracle and diffusion operations increase the probability of obtaining the desired candidates at measurement. Grover's algorithm searches for solutions identified by an oracle \cite{grover1996}, while BBHT algorithm extends the search to cases where the number of solutions is unknown \cite{boyer1998}. D\"urr-H\o yer algorithm extends quantum search to minimum or maximum finding \cite{durr1996}. QSA variants have also been studied for communication and resource-allocation problems \cite{botsinis2019}.
+
+Quantum annealing maps discrete optimization problems to energy minimization and has been applied within hybrid network optimization schemes \cite{kadowaki1998,zhang2024tnse,wei2024tnse}. QAOA uses parameterized quantum circuits to optimize combinatorial problems normally expressed in QUBO and Ising models \cite{farhi2014,lucas2014}. Constraints can be incorporated into these formulations through penalty terms added to the cost function.
+
+Quantum learning uses parameterized quantum circuits in a different way. The network observations are first encoded into quantum states and processed by parameterized gates \cite{biamonte2017,narottama2022qnn,ansere2024qdrl}. Measurements of the resulting states provide the outputs for the control policy. A classical optimizer adjusts circuit parameters according to the measured performance, forming a hybrid quantum-classical training loop. This approach learns mappings between network conditions and control actions without explicitly solving an optimization problem for every input. Variational quantum methods have also been investigated for continuous network variables, where parameterized circuits optimize continuous control quantities rather than discrete assignment configurations \cite{zhang2024beamforming,sharma2026tnse}.
+These approaches treat objectives, constraints, and assignment configurations
+differently, leading to the comparison below.
+
+
+\subsection{Requirements and comparison of quantum approaches}
+\label{sec:bg-comparison}
+
+Network utilities may take continuous values even when assignment variables are discrete, and several resource constraints can apply to the same assignment configuration. Candidate choices and resource capacities can also vary across network instances without changing the underlying assignment structure. 
+A finite-width numerical representation limits the resolution of continuous utility values, whereas penalty formulations modify the objective by incorporating constraint violations. Direct evaluation of the network constraints avoids such modification and allows feasible assignments to be compared according to the original utility. Network scale presents another limitation. A complete assignment problem can exceed the circuit width and depth available on a single NISQ processor \cite{18,23}. Therefore, large-scale problems need to be divided into small quantum computations and coordinated to construct a consistent network-wide assignment.
+
+The quantum formulation determines how these problem characteristics are handled during computation.
+QUBO-based QAOA and quantum annealing normally incorporate constraints into the cost function through penalty terms \cite{farhi2014,lucas2014,zhang2024tnse,wei2024tnse}. The resulting cost function differs from the original network objective, and constraint satisfaction depends on the penalty formulation. 
+Different assignment variables and constraints can be represented in QUBO and Ising forms, but
+changes in the problem structure generally require corresponding changes in the formulation. Hybrid decompositions have been investigated for problems beyond a single quantum processor \cite{zhang2024tnse,wei2024tnse}, although the coordination proceeds with the reformulated optimization problem.
+
+Quantum learning avoids explicit optimization for each network input by learning a control policy through parameterized quantum circuits \cite{narottama2022qnn,ansere2024qdrl,ansere2026tnse}. 
+For optimization problems with explicitly defined constraints, these conditions are generally embedded into the training objective or the output parameterization instead of being directly evaluated for each candidate solution. Tight constraints can increase the training effort needed to reduce constraint violations, while strict feasibility is not inherently guaranteed by the learned model. Parameterized circuits can process continuous network observations and learn different control mappings, but changes in the network problem may also require additional training. Hardware implementation presents another challenge. Reliable execution and training of large parameterized quantum circuits remain technically limited on present-day NISQ processors. As a result, network-scale quantum learning studies are still predominantly evaluated through simulation, while physical QPU implementations remain limited to relatively small circuit instances.
+
+Variational quantum methods have also been applied to continuous network
+optimization \cite{zhang2024beamforming,sharma2026tnse}. Their parameterized circuits can directly optimize continuous control variables. This avoids the numerical encoding of such variables into discrete
+assignment states. These formulations, however, do not directly provide the discrete feasibility checks for assignment problems with heterogeneous candidate sets and multiple capacity constraints.
+
+
+
+
+
+
+
+
+
+
+Oracle-based QSAs evaluate discrete assignment constraints directly on candidate quantum states. Quantized or weighted QSAs can exclude infeasible assignments without incorporating constraint violations into the objective \cite{seo2022}. However, the objective representation relies on discretized numerical values, which limits the precision with which the original utility can be represented. Existing constructions also focus on relatively simple assignment conditions and do not directly evaluate multiple heterogeneous capacity constraints within the same oracle.
+
+Enumeration-based oracles provide another direct approach to feasibility \cite{jang2025cqf}
+Candidate assignments can be checked against the original constraints without penalty reformulation, and accepted states satisfy the specified feasibility conditions. The circuit construction explicitly accounts for candidate configurations, thereby causing the circuit depth to increase rapidly as the number of assignment choices grows. This limits its extension to large network instances and motivates constraint
+evaluation based on the structure of the assignment rather than enumeration of feasible configurations.
+
+Among more structured oracle-based methods, Grover adaptive search (GAS) represents numerical objective and constraint values in quantum registers and uses threshold comparisons \cite{gilliam2021gas,fujiwara2025gas}. This approach can enforce explicitly
+defined constraints, but the finite width of the value registers determines numerical precision and increases circuit resources as more quantities are involved. Quantum tree generation (QTG) constructs feasible states according to the remaining resource budget and has been applied to knapsack-type optimization \cite{wilkening2025qtg,wilkening2025qkp}. Capacity conditions are incorporated
+directly during state generation, but the construction follows the sequential budget structure of the underlying problem. Thus, assignment problems, where one choice simultaneously affects different resource capacities, require a different mechanism for evaluating the coupled constraints.
+
+Existing approaches address different aspects of constrained assignment optimization, but important limitations remain in constraint evaluation, objective representation, and scalability. Table~\ref{tab} summarizes the comparison. 
+The proposed approach directly evaluates assignment constraints through arithmetic oracles and maps the original utility to quantum-state amplitudes without penalty reformulation. Large problems are divided into hardware-compatible local computations and coordinated across their outputs. The following sections present the corresponding quantum search and distributed coordination methods.
+
+{
+\newcolumntype{M}[1]{>{\centering\arraybackslash}m{#1}}
+
+\begin{table*}[!t]
+\centering
+\caption{Comparison of quantum approaches for assignment-based network management.
+$\bigcirc$: supported;
+$\triangle$: supported with restrictions;
+$\times$: not supported.}
+\label{tab:related}
+
+\renewcommand{\arraystretch}{1.3}
+\setlength{\tabcolsep}{2pt}
+\scriptsize
+
+\begin{tabular}{@{}M{2.7cm} M{2.3cm} M{1.55cm} M{1.55cm} M{1.8cm}
+     M{1.55cm} M{1.7cm} M{1.55cm} M{1.55cm}@{}}
+\toprule
+\textbf{Approach} &
+\textbf{Constraint enforcement} &
+\textbf{Objective preservation} &
+\textbf{Strict feasibility} &
+\textbf{Heterogeneous candidates / capacities} &
+\textbf{Coupled constraints} &
+\textbf{Reusable quantum design} &
+\textbf{Distributed execution} &
+\textbf{Gate-level QPU demo} \\
+\midrule
+
+QUBO, QAOA, quantum annealing
+ \cite{farhi2014,lucas2014,kadowaki1998,zhang2024tnse,wei2024tnse} &
+Penalty-augmented objective &
+$\triangle$ &
+$\times$ &
+$\triangle$ &
+$\triangle$ &
+$\times$ &
+$\triangle$ &
+$\bigcirc$ \\
+
+Quantum learning policies
+ \cite{narottama2022qnn,ansere2024qdrl,ansere2026tnse} &
+Penalty-based ~~~training &
+$\bigcirc$ &
+$\times$ &
+$\triangle$ &
+$\triangle$ &
+$\times$ &
+$\triangle$ &
+$\times$ \\
+
+Variational continuous optimization
+ \cite{zhang2024beamforming,sharma2026tnse} &
+Parameterized constraints &
+$\bigcirc$ &
+$\triangle$ &
+$\times$ &
+$\times$ &
+$\times$ &
+$\times$ &
+$\triangle$ \\
+
+Quantized weighted QSA
+ \cite{seo2022} &
+Pairwise checks $O(N^2)$ &
+$\times$ &
+$\bigcirc$ &
+$\times$ &
+$\times$ &
+$\times$ &
+$\times$ &
+$\bigcirc$ \\
+
+Enumeration oracle
+ \cite{jang2025cqf} &
+$O((N+1)^{|\mathcal{U}|})$ depth &
+$\bigcirc$ &
+$\bigcirc$ &
+$\triangle$ &
+$\triangle$ &
+$\times$ &
+$\times$ &
+$\triangle$ \\
+
+Grover adaptive search
+ \cite{gilliam2021gas,fujiwara2025gas} &
+One value register ~~~per constraint &
+$\triangle$ &
+$\bigcirc$ &
+$\bigcirc$ &
+$\triangle$ &
+$\triangle$ &
+$\times$ &
+$\bigcirc$ \\
+
+QTG-based knapsack search
+ \cite{wilkening2025qtg,wilkening2025qkp} &
+$O(N)$-layer state preparation &
+$\triangle$ &
+$\bigcirc$ &
+$\bigcirc$ &
+$\times$ &
+$\triangle$ &
+$\times$ &
+$\times$ \\
+
+\textbf{Proposed} &
+\textbf{Arithmetic \qquad $O(D)$ matches} &
+$\bigcirc$ &
+$\bigcirc$ &
+$\bigcirc$ &
+$\bigcirc$ &
+$\bigcirc$ &
+$\bigcirc$ &
+$\bigcirc$ \\
+
+\bottomrule
+\end{tabular}
+\end{table*}
+}
+
+}
+
+
+% =====================================================================
+\section{System Model and Exact Zone Factorization}
+\label{sec:formulation}
+
+The target task is a joint AP-RB assignment rather than two independent optimization levels. Each RB belongs to exactly one AP, and each UE selects one RB from a coverage-dependent candidate set. The selected RB therefore determines the serving AP and simultaneously participates in an RB-exclusivity constraint and an AP-admission constraint. Inter-cell association is recovered by aggregating RB choices by owner AP, while intra-cell allocation is recovered by restricting the candidate set to one AP; these are projections of the joint model, not separate variables in the proposed system.
+
+This task profile determines what a solver must provide. The objective is continuous and additive, so the quantum weight must preserve the ordering of $\sum_i\sum_r u_{i,r}y_{i,r}$ without quantizing it into a value register, and every reported sample must strictly satisfy UE validity, RB exclusivity, and AP capacity. The problem data are heterogeneous: each UE may carry a different coverage-dependent candidate set $\calV_i$ and each AP its own admission limit $W_a$, while the RB- and AP-level constraints bind the same selection and must therefore be evaluated on the same assignment, without parity cancellation between simultaneous violations. Deployment adds two further conditions: a new instance should be obtained from one reusable local circuit by substituting candidate maps, utilities, owner labels, and capacities rather than by redesigning the topology, and the circuit should operate distributedly at local width, growing with zone-local density while zones are coupled only through their shared UEs.
+
+
+Fig.~\ref{fig:system} shows the joint AP-RB assignment model.
+
+\begin{figure}[!t]
+\centering
+% \figph[6cm]{[Fig.~1 placeholder] Overall system model: each AP owns a disjoint RB pool; a UE selects one candidate RB, and that single choice fixes its serving AP. The APs are partitioned into zones, and a UE covered by more than one zone is a boundary UE.}
+\includegraphics[width=\columnwidth]{fig/fig1}
+\caption{System model for joint AP-RB assignment. Selecting one candidate RB also fixes the serving AP, so the AP admission limit and the RB access limit constrain the same selection. APs are partitioned into zones, and a UE covered by two zones is a boundary UE shared between them.}
+\label{fig:system}
+\end{figure}
+
+% \begin{align}
+% \max_{\bm x\in \{0,1\}^n}\quad
+% &\sum_{i\in\calU}\sum_{r\in\calV_i}w_{i,r}y_{i,r}\\
+% \mathrm{s.t.}\quad
+% &\sum_{r\in\calV_i}x_{i,r}=1,
+% &&\forall i\in\calU,\\
+% &\sum_{i\in\calU}w_{i,r}x_{i,r}\le C_r,
+% &&\forall r\in\calR.
+% \end{align}
+
+
+
+\subsection{Joint AP-RB Assignment}
+\label{sec:general-form}
+
+Let $\calA$ be the AP set. AP $a$ owns a disjoint RB pool $\calR_a$, so $\calR=\bigcup_{a\in\calA}\calR_a$, and $a(r)$ denotes the owner of RB $r$. UE $i\in\calU$ may select one RB from its coverage-dependent candidate set $\calV_i\subseteq\calR$. The RB variable is the actual decision; the AP variable is retained only as the association implied by that decision:
+\begin{equation}
+\label{eq:binary-vars}
+\begin{aligned}
+y_{i,r}=1
+&\iff \text{UE $i$ selects RB $r$},\\
+x_{i,a}
+&=\sum_{r\in\calV_i\cap\calR_a}y_{i,r}.
+\end{aligned}
+\end{equation}
+Because each UE selects exactly one RB and each RB has one owner, $x_{i,a}$ is binary and is determined completely by $\bm y$. It is an interpretation variable connecting the joint model to the conventional two-phase formulation, not an independent choice.
+
+Both resource types carry a capacity, written $W$ with the index naming the resource: $W_r$ is the access limit of RB $r$ and $W_a$ the admission limit of AP $a$. With utility $u_{i,r}\ge0$ the joint problem can therefore be written using $\bm y$ alone:
+\begin{equation}
+\label{eq:joint-problem}
+\begin{aligned}
+\max_{\bm y}\quad
+&J(\bm y)=\sum_{i\in\calU}\sum_{r\in\calV_i}u_{i,r}y_{i,r}\\
+\mathrm{s.t.}\quad
+&\sum_{r\in\calV_i}y_{i,r}=1,
+&&\forall i\in\calU,\\
+&\sum_{i\in\calU}y_{i,r}\le W_r,
+&&\forall r\in\calR,\\
+&\sum_{i\in\calU}\sum_{r\in\calV_i\cap\calR_a}y_{i,r}\le W_a,
+&&\forall a\in\calA,\\
+&y_{i,r}\in\{0,1\}.
+\end{aligned}
+\end{equation}
+The first constraint selects one candidate RB per UE, the second enforces each RB access limit, and the third aggregates all selected RBs owned by the same AP. Substituting the association relation in~\eqref{eq:binary-vars} gives the AP constraint in~\eqref{eq:joint-problem}. The RB and AP limits are not redundant: several individually admissible RB loads can exceed the common AP limit, whereas spare AP capacity cannot override a saturated RB. Exclusive RB assignment is the special case $W_r=1$.
+
+Let $D=\sum_{i\in\calU}|\calV_i|$ denote the number of admissible UE-RB candidate edges. The feasible set used throughout the distributional derivation is
+\begin{equation}
+\label{eq:feasible}
+\calF=
+\left\{
+\bm y\in\{0,1\}^{D}:
+\bm y\text{ satisfies all constraints in~\eqref{eq:joint-problem}}
+\right\}.
+\end{equation}
+
+\subsection{Exact Zone Factorization}
+\label{sec:factorization}
+
+Partition the APs into zones $\calZ$, with $\calA=\bigcup_{z\in\calZ}\calA_z$ and $\calR_z=\bigcup_{a\in\calA_z}\calR_a$. A zone concerns a UE whenever it owns at least one of that UE's candidate RBs. The local, global-boundary, and zone-boundary UE sets are
+\begin{equation}
+\label{eq:zone-sets}
+\begin{aligned}
+\calU_z&=\{i:\calV_i\cap\calR_z\ne\emptyset\},\\
+\calB&=\{i:i\text{ appears in at least two zones}\},\\
+\calB_z&=\calU_z\cap\calB.
+\end{aligned}
+\end{equation}
+Each zone keeps a copy $\bm y_i^{(z)}=(y_{i,r}^{(z)})_{r\in\calV_i}$ for every UE it concerns, and every copy is defined on the full candidate set $\calV_i$. A value owned outside zone $z$ is legitimate for the copy but contributes no load or utility to $z$. This full-domain convention makes equality between copies well defined.
+
+Ownership assigns every utility term and capacity constraint to exactly one zone. Let $\phi_z(\bm y_z)=1$ when all UE codes held by zone $z$ are valid and every RB and AP limit owned by $z$ is satisfied. The objective decomposes as
+\begin{equation}
+\label{eq:local-utility}
+J_z(\bm y_z)=
+\sum_{i\in\calU_z}\sum_{r\in\calV_i\cap\calR_z}
+ u_{i,r}y_{i,r}^{(z)},
+\qquad
+J(\bm y)=\sum_{z\in\calZ}J_z(\bm y_z),
+\end{equation}
+provided that the copies of each shared UE agree. Let $E_i=1$ exactly when all copies of boundary UE $i$ select the same RB. Global feasibility is then equivalent to local strict feasibility plus boundary agreement:
+\begin{equation}
+\label{eq:factorization}
+\bm y\in\calF
+\iff
+\left[\phi_z(\bm y_z)=1,\ \forall z\in\calZ\right]
+\land
+\left[E_i=1,\ \forall i\in\calB\right].
+\end{equation}
+No global constraint remains: each zone verifies only the constraints it owns, and zones interact solely through the agreement of boundary copies.
+
+The two factorizations determine the local distribution required for distributed coordination. Feasibility factorizes multiplicatively by~\eqref{eq:factorization}, whereas utility factorizes additively by~\eqref{eq:local-utility}. We therefore use a common exponential utility weight with $\lambda>0$, for which
+\[
+\prod_{z\in\calZ}\exp[\lambda J_z]
+=
+\exp\!\left[\lambda\sum_{z\in\calZ}J_z\right]
+=
+\exp[\lambda J].
+\]
+The same $\lambda$ is used across zones so that their local distributions can be recombined according to the original global utility. Appendix~\ref{app:exponential} shows that, under the stated regularity conditions, the exponential form is the unique shared multiplicative weight that depends only on the additive global utility.
+
+Section~\ref{sec:circuit} implements this utility weight directly through controlled rotations, while Section~\ref{sec:hybrid} treats the case in which hardware limitations require different execution exponents and reconstructs the distributions at a common $\lambda$ after measurement.
+
+% =====================================================================
+\section{Quantum Circuit Architecture}
+\label{sec:circuit}
+
+Fig.~\ref{fig:superposition} shows what the circuit is asked to produce. Every complete assignment of a zone occupies one computational state, so a single superposition carries all of them; the encoded utility and the strict-feasibility marking then decide how much observation probability each state keeps, and a measurement returns one strictly feasible assignment drawn with that probability.
+
+The local CQF circuit comprises state preparation, objective-order-preserving controlled rotations, arithmetic evaluation of all RB and AP constraints owned by the zone, one superflag conjunction, mirrored uncomputation, amplitude amplification, and measurement. Every zone executes its circuit independently; neither state preparation nor the first sampling stage receives a message from another zone. The overall pipeline is shown in Fig.~\ref{fig:circuit}.
+
+\begin{figure}[!t]
+\centering
+% \figph[6cm]{[Fig.~2 placeholder] Superposition view: complete AP-RB assignments occupy computational states; utility encoding and strict-feasibility marking set the observation probability of each state, which amplification then raises on the accepted states before measurement.}
+\includegraphics[width=\columnwidth]{fig/fig2}
+\caption{Superposition view of zone-local assignment. Complete AP-RB assignments occupy computational states, utility encoding and strict-feasibility marking set the observation probability carried by each state, and amplification raises the probability of the accepted states before measurement.}
+\label{fig:superposition}
+\end{figure}
+
+\begin{figure}[!t]
+\centering
+% \figph[6cm]{[Fig.~3 placeholder] Overall quantum circuit of the zone-local sampler: state preparation over valid codewords; objective-preserving controlled $R_Y$ rotations; arithmetic evaluation of all owned RB and AP constraints on a reusable counter; a single superflag conjunction; mirrored uncomputation; amplitude amplification; and measurement.}
+\includegraphics[width=\columnwidth]{fig/fig3}
+\caption{Concept of the zone-local CQF quantum circuit.}
+\label{fig:circuit}
+\end{figure}
+
+\subsection{Register Encoding and Strict Validity}
+\label{sec:encoding}
+
+The one-choice constraint in~\eqref{eq:joint-problem} makes the block $(y_{i,r})_{r\in\calV_i}$ one-hot. UE $i$ is therefore stored without loss in $\ell_i=\lceil\log_2|\calV_i|\rceil$ qubits holding a code $c_i$, with a fixed codebook $\chi_i:\{0,\ldots,|\calV_i|-1\}\to\calV_i$ and decoded selection $r_i=\chi_i(c_i)$. The one-hot block $\bm y_z$ and the decoded tuple $\bm r_z$ describe the same local configuration, so the two are used interchangeably below; in particular $\phi_z$ and $J_z$ are written with either argument. The state-register width of zone $z$ is
+\begin{equation}
+\label{eq:state-width}
+Q_z=\sum_{i\in\calU_z}\left\lceil\log_2|\calV_i|\right\rceil.
+\end{equation}
+The encoding enforces one selection per UE without a counter. When $|\calV_i|$ is not a power of two, unused computational codewords are invalid. Strict mode raises a validity-violation flag for every such codeword, so it receives zero accepted probability. The initial preparation distribution over decoded local assignments is denoted by $q_{0,z}(\bm r_z)$.
+
+Let $N_z=|\calU_z|$. Auxiliary registers comprise one cost qubit and one validity flag per local UE, a reusable QFT counter of $\lceil\log_2(N_z+1)\rceil$ qubits, one violation flag for each RB and AP constraint owned by the zone, comparator workspace, and one superflag ancilla.
+
+\subsection{Circuit Overview}
+\label{sec:pipeline-map}
+
+In plain terms the computation follows the chain
+\[
+\begin{gathered}
+\text{state preparation}
+\rightarrow
+\text{utility encoding}\\
+\rightarrow
+\text{constraint evaluation}
+\rightarrow
+\text{single-superflag marking}\\
+\rightarrow
+\text{uncomputation}
+\rightarrow
+\text{amplification}.
+\end{gathered}
+\]
+The zone circuit is built from four named operators, introduced one at a time.
+
+Preparation places every local assignment in superposition and writes the utility weights:
+\begin{equation}
+\label{eq:op-prep}
+\calP_z=\Theta_z H^{\otimes Q_z}.
+\end{equation}
+The Hadamard layer spreads the state register over all codewords, and $\Theta_z$ applies the controlled rotations of Section~\ref{sec:amplitude} to load each UE's utility into its own cost qubit.
+
+The oracle decides which of those assignments are acceptable:
+\begin{equation}
+\label{eq:op-oracle}
+\calO_z=\calE_z^{\dagger}\Lambda_z\calE_z.
+\end{equation}
+Reading right to left, $\calE_z$ evaluates every validity, RB, and AP constraint the zone owns and records the outcomes in flags; $\Lambda_z$ marks the single case in which all of those flags and all cost qubits are zero; and $\calE_z^{\dagger}$ retraces the evaluation to clear the arithmetic workspace. The oracle therefore leaves nothing behind except the mark.
+
+One amplification round is the oracle followed by a reflection:
+\begin{equation}
+\label{eq:op-round}
+\calG_z=\calD_z\calO_z,
+\qquad
+\calD_z=\calP_z\left(2\ket{\bm 0}\bra{\bm 0}-I\right)\calP_z^{\dagger}.
+\end{equation}
+The reflection is taken about the prepared state $\calP_z\ket{\bm 0}$, not about the uniform state, because the cost qubits are already rotated at that point. Uncomputing the workspace before $\calD_z$ is what makes this reflection meaningful: leftover arithmetic would entangle with the state register and the round would no longer act in a two-dimensional subspace.
+
+The full circuit applies preparation once and the round $k$ times:
+\begin{equation}
+\label{eq:circuit-chain}
+\calC_z=\calG_z^{\,k}\calP_z .
+\end{equation}
+Only $k$ is tuned at run time; the constraint topology inside $\calO_z$ is fixed by the zone and is not recompiled.
+
+The output separates the total accepted-branch probability from the conditional distribution inside that branch:
+\begin{subequations}
+\label{eq:pipeline}
+\begin{equation}
+\label{eq:pipeline-branches}
+\calC_z\ket{\bm 0}
+=
+\sin\theta_{z,k}\ket{\Psi_z}
++
+\cos\theta_{z,k}\ket{\Psi_z^{\perp}},
+\end{equation}
+\begin{equation}
+\label{eq:accepted-state}
+\ket{\Psi_z}
+=
+\sum_{\bm r_z\in\calF_z}
+\sqrt{p_z(\bm r_z)}\,
+\ket{\bm r_z}
+\ket{\bm 0}_{\mathrm{cost}}
+\ket{\bm 0}_{\mathrm{work}}
+\ket{-}_{\mathrm{sf}},
+\end{equation}
+\begin{equation}
+\label{eq:accept-probability}
+P_z(k)=\sin^2\theta_{z,k}.
+\end{equation}
+\end{subequations}
+Here $\calF_z=\{\bm r_z:\phi_z(\bm r_z)=1\}$, and $p_z(\bm r_z)$ is the conditional probability of assignment $\bm r_z$ inside the accepted branch. Amplification changes $P_z(k)$ by moving probability mass between the accepted and rejected subspaces, but it does not change the relative probabilities $p_z$ within the accepted subspace.
+
+\subsection{Objective-Preserving Amplitude Encoding}
+\label{sec:amplitude}
+
+Section~\ref{sec:factorization} established the local distribution required for distributed coordination: the probability weight must be exponential in the local utility, with one exponent shared across zones. This subsection shows how that distribution is implemented in the quantum circuit by mapping each UE's owner-local utility directly to a controlled-rotation angle. The resulting cost-qubit probabilities preserve the original additive utility ordering and produce the required exponential weight for each complete local assignment. The derivation of this relationship and the uniqueness of the exponential form are given in Appendix~\ref{app:exponential}.
+
+For a fixed zone, define the owner-local utility contribution as $u_{i,r}^{(z)}=u_{i,r}$ for $r\in\calR_z$ and $u_{i,r}^{(z)}=0$ otherwise. Then $J_z(\bm r_z)=\sum_{i\in\calU_z}u_{i,r_i}^{(z)}$, which is equivalent to~\eqref{eq:local-utility}. Let $u_{z,i}^{\max}=\max_{r\in\calV_i}u_{i,r}^{(z)}$ and choose $\lambda>0$. The controlled rotation for candidate $r$ is parameterized as
+\begin{equation}
+\label{eq:theta}
+\begin{aligned}
+g_{z,i}(r)
+&=\exp[-\lambda(u_{z,i}^{\max}-u_{i,r}^{(z)})],\\
+\theta_{z,i,r}
+&=2\arccos\sqrt{g_{z,i}(r)}.
+\end{aligned}
+\end{equation}
+Since $0<g_{z,i}(r)\le1$, these parameters can be applied directly to a controlled-$R_Y$ gate. The maximum-utility candidate has unit weight, while a larger utility loss produces a smaller probability of observing the corresponding cost qubit in zero.
+
+For a complete local assignment, the joint all-zero cost probability produced by these rotations is
+\begin{equation}
+\label{eq:local-exp}
+g_z(\bm r_z)
+\equiv
+P(\bm 0_{\mathrm{cost}}\mid\bm r_z)
+=
+\kappa_z\exp[\lambda J_z(\bm r_z)],
+\end{equation}
+where $\kappa_z>0$ is independent of the assignment. Therefore, the rotation encoding preserves the ordering of complete local assignments according to the original additive utility. The derivation of \eqref{eq:local-exp} from the per-UE rotations is given in Appendix~\ref{app:exponential}.
+
+Before amplification, the total probability mass satisfying both strict feasibility and the all-zero cost event is
+\begin{equation}
+\label{eq:mu}
+\mu_z=
+\sum_{\bm r_z\in\calF_z}
+q_{0,z}(\bm r_z)g_z(\bm r_z).
+\end{equation}
+Conditioning on that event gives the local assignment law
+\begin{equation}
+\label{eq:conditional-distribution}
+p_z(\bm r_z)=
+\frac{q_{0,z}(\bm r_z)g_z(\bm r_z)}{\mu_z},
+\qquad
+\bm r_z\in\calF_z.
+\end{equation}
+For uniform preparation over valid codewords,
+\begin{equation}
+\label{eq:gibbs-local}
+p_z(\bm r_z)\propto
+\exp[\lambda J_z(\bm r_z)],
+\qquad
+\bm r_z\in\calF_z.
+\end{equation}
+Therefore the circuit produces a utility-weighted joint distribution over strictly feasible local assignments, and it does not collapse the output definition to a single local optimum.
+
+Because $\lambda$ multiplies a utility it carries the inverse unit of $u_{i,r}$, so a bare numerical value of $\lambda$ is not comparable across zones or across utility models. Fix a global scale $\bar u>0$ from the dynamic range of the utility model and write
+\[
+\lambda=\beta/\bar u ,
+\]
+with $\beta$ dimensionless. The scale $\bar u$ is a property of the utility model rather than of an instance, so it is fixed before execution and needs no exchange between zones. The shared exponent demanded in Section~\ref{sec:factorization} is a shared $\lambda$, hence a shared $\beta$ together with a common $\bar u$; normalizing each zone by its own maximum utility would reinstate zone-specific exponents and break the composability requirement, even though the utility ordering would still be preserved within each zone taken alone.
+
+Two limits bound the usable range of $\beta$. As $\beta\to0$ the accepted law approaches the uniform law on $\calF_z$ and carries no utility information. As $\beta$ grows, the accepted mass in~\eqref{eq:mu} falls roughly like $\exp[-\beta\overline{\Delta}_zN_z/\bar u]$, where $\overline{\Delta}_z$ is the mean per-UE utility gap, and amplification restores it at $O(\mu_z^{-1/2})$ rounds; the cost of one accepted draw therefore grows in the circuit depth, with $\beta$ and with the zone size. The local solver is consequently operated at moderate $\beta$, where its output is a genuinely spread law. The $\beta\to\infty$ limit is a zero-temperature optimizer and is outside the regime claimed here. Section~\ref{sec:hybrid} separates the exponent that a zone can afford to execute from the exponent at which zones are recombined, so that this hardware limit does not dictate the merge.
+
+\subsection{Strict-Feasibility Oracle}
+\label{sec:oracle}
+
+The evaluation operator $\calE_z$ checks all validity, RB, and AP constraints owned by zone $z$ using one reusable counter. A QFT adder maps $w$ to $w+c\bmod 2^n$; the counter width is selected so that every possible local load is below $2^n$, which prevents wraparound, and the inverse phases clear the counter during uncomputation.
+
+The load carried by a resource is written $L$ with the index naming the resource, matching the capacity symbol it is compared against. For every RB $r\in\calR_z$ and AP $a\in\calA_z$, the oracle computes
+\begin{equation}
+\label{eq:load}
+\begin{aligned}
+L_r(\bm r_z)
+&=\sum_{i\in\calU_z}\ind{r_i=r},\\
+L_a(\bm r_z)
+&=\sum_{i\in\calU_z}\ind{r_i\in\calR_a}.
+\end{aligned}
+\end{equation}
+The two lines count the same thing at two granularities: how many local UEs land on one RB, and how many land anywhere inside one AP. A separate validity flag excludes unused UE codewords, so an invalid selection can never be accepted (Fig.~\ref{fig:impl-valid}). For an RB limit, a code-match ancilla conditionally increments the counter for each matching UE code, and an integer comparator raises an RB violation flag exactly when $L_r>W_r$ (Fig.~\ref{fig:impl-rb}). An AP limit is checked the same way: every candidate code owned by $a$ controls one increment, and the comparator raises an AP violation flag exactly when $L_a>W_a$ (Fig.~\ref{fig:impl-ap}). The counter is cleared and reused after each owned resource.
+
+\begin{figure}[!t]
+\centering
+% \figph[5cm]{[Fig.~4 placeholder] Quantum implementation of UE validity: per-UE state register with codebook $\chi_i$; unused codewords set a validity-violation flag and are excluded from the accepted distribution.}
+\includegraphics[width=\columnwidth]{fig/fig4}
+\caption{UE-code validity marking for the one-choice condition in~\eqref{eq:joint-problem}.}
+\label{fig:impl-valid}
+\end{figure}
+
+\begin{figure}[!t]
+\centering
+% \figph[5cm]{[Fig.~5 placeholder] Quantum implementation of the RB limit: a code-match ancilla increments the reusable counter for each UE holding RB $r$; an integer comparator sets an RB violation flag when $L_r\ge W_r+1$.}
+\includegraphics[width=\columnwidth]{fig/fig5}
+\caption{RB-access check for the second constraint in~\eqref{eq:joint-problem}.}
+\label{fig:impl-rb}
+\end{figure}
+
+\begin{figure}[!t]
+\centering
+% \figph[5cm]{[Fig.~6 placeholder] Quantum implementation of the AP limit: every candidate code whose owner is $a$ increments the counter; a comparator sets an AP violation flag when $L_a\ge W_a+1$.}
+\includegraphics[width=\columnwidth]{fig/fig6}
+\caption{AP-admission check for the third constraint in~\eqref{eq:joint-problem}.}
+\label{fig:impl-ap}
+\end{figure}
+
+The single-superflag acceptance condition is
+\begin{equation}
+\label{eq:accept-condition}
+\bm r_z\ \text{accepted}
+\iff
+\left\{
+\begin{array}{l}
+\text{all UE codes are valid},\\
+L_r(\bm r_z)\le W_r,\quad \forall r\in\calR_z,\\
+L_a(\bm r_z)\le W_a,\quad \forall a\in\calA_z,\\
+\text{all cost qubits read zero}.
+\end{array}
+\right.
+\end{equation}
+
+\subsection{Superflag Conjunction and Correctness}
+\label{sec:superflag}
+
+\begin{proposition}[Strict single-superflag marking]
+\label{prop:superflag}
+Independent phase kickbacks from individual violation flags produce $(-1)^{V(\bm r_z)}$, where $V(\bm r_z)$ is the number of violations, and therefore fail to distinguish an even positive number of violations from zero violations. A single multi-controlled operation $\Lambda_z$ marks a component exactly under~\eqref{eq:accept-condition}, irrespective of how many validity, RB, and AP violations occur simultaneously.
+\end{proposition}
+\begin{IEEEproof}
+The parity construction applies one sign flip per violation and yields $(-1)^V$. The superflag conjunction instead fires only when every violation flag is zero and every cost control is zero. For a fixed feasible assignment, the squared projection onto the marked ancilla state is $q_{0,z}(\bm r_z)g_z(\bm r_z)$; for an infeasible assignment it is zero. Summation gives~\eqref{eq:mu}, and normalization gives~\eqref{eq:conditional-distribution}.
+\end{IEEEproof}
+
+All match ancillas, counters, comparators, and constraint flags are uncomputed before the reflection $\calD_z$ of~\eqref{eq:op-round}. This preserves the intended reflection and prevents stale arithmetic information from entering the next amplification round. For example, an assignment can violate both an RB limit and its owner AP limit. Independent phase flips cancel in that case, whereas the superflag remains unset because not all violation flags are zero.
+
+\subsection{Amplification and the Induced Local Distribution}
+\label{sec:distribution}
+
+The angle in~\eqref{eq:accept-probability} is set entirely by the accepted mass: $\theta_{z,k}=(2k+1)\arcsin\sqrt{\mu_z}$, so the acceptance probability after $k$ rounds is
+\begin{equation}
+\label{eq:success}
+P_z(k)=
+\sin^2\!\left[(2k+1)\arcsin\sqrt{\mu_z}\right].
+\end{equation}
+The number of rounds can be selected from an estimate or calibration of $\mu_z$. Amplification moves probability between the accepted and rejected branches and changes nothing else: a successful state-register measurement still follows the conditional joint distribution~\eqref{eq:conditional-distribution}.
+
+% =====================================================================
+\section{Boundary Reduction and Decimation}
+\label{sec:hybrid}
+
+This section separates three layers. Equations~\eqref{eq:reweight}-\eqref{eq:ess} reconcile zones that execute at different exponents onto the single exponent required by Section~\ref{sec:factorization}. Equations~\eqref{eq:zone-gibbs}-\eqref{eq:boundary-law} are an exact reduction of the global factorized distribution to the boundary variables. Equation~\eqref{eq:decimation-map} and the confidence score~\eqref{eq:decimation} define the finite classical procedure that converts finite-sample boundary information into one assignment.
+
+\subsection{Execution Exponent and Reconstruction at a Common $\lambda$}
+\label{sec:reweighting}
+
+Two requirements established so far pull in opposite directions. Section~\ref{sec:factorization} requires one exponent $\lambda$ in every zone, because a zone-specific exponent cannot be pulled out of the product that recombines zones. Section~\ref{sec:amplitude} shows that the exponent a zone can execute is limited by its own acceptance mass $\mu_z$, which depends on how tightly that zone happens to be constrained; a dense zone cannot afford the exponent that a sparse zone runs comfortably. The two are reconciled after measurement rather than before it, so that the merge is never forced to adopt whichever exponent the most constrained zone could afford.
+
+Zone $z$ loads its own $\lambda_z\le\lambda$ into~\eqref{eq:theta}, selected as the largest exponent whose acceptance mass keeps the expected shot count within that zone's budget, and records the local utility $J_z(\bm r_z^{(k)})$ of every accepted draw alongside the draw itself. Each draw is then reweighted to the common exponent by
+\begin{equation}
+\label{eq:reweight}
+w_z^{(k)}
+=\exp\!\left[(\lambda-\lambda_z)\,J_z\!\left(\bm r_z^{(k)}\right)\right],
+\end{equation}
+which is computed from the zone's own measurement record and its own utility table alone. No inter-zone message is involved, so a zone report still depends on that zone only, and the exponent used for the merge is a design parameter rather than an artifact of hardware.
+
+The reconstruction is unbiased in the population sense. Strict feasibility is enforced by a hard flag, so the support $\calF_z$ in~\eqref{eq:conditional-distribution} does not depend on the exponent: every configuration carrying mass at $\lambda$ already carries mass at $\lambda_z$, and reweighting is never required to create a configuration that the accepted branch excludes. What is lost is sample efficiency. Writing weighted frequencies in place of counts, the effective number of samples surviving the reweighting is
+\begin{equation}
+\label{eq:ess}
+\widetilde{K}_z(\lambda)=
+\frac{\left(\sum_k w_z^{(k)}\right)^{2}}
+{\sum_k\left(w_z^{(k)}\right)^{2}} .
+\end{equation}
+It equals $K_z$ when the weights are all equal and falls toward one when a single draw dominates. It is maximized at $\lambda_z=\lambda$ and decreases as the two exponents separate, since high-utility configurations that are rare at $\lambda_z$ receive large weights and dominate the estimate. A common exponent is admissible when $\min_z\widetilde{K}_z(\lambda)\ge K_{\min}$. Reweighting therefore trades quantum shots for classical estimator variance, and the trade is bounded and observable rather than silent. The weighted estimators are self-normalized and carry the usual $O(1/K_z)$ bias, which vanishes in the same limit.
+
+All boundary quantities defined below are the weighted versions of their counting definitions: an empirical frequency of the form $|\{\cdot\}|/|\calS_z|$ is replaced by the corresponding ratio of sums of $w_z^{(k)}$, and a cardinality threshold on a retained list is replaced by a threshold on $\widetilde{K}_z$. The unweighted notation is kept in the main text for readability, and Appendix~\ref{app:decimation} states the weighted forms used in the implementation. When every zone executes at the common exponent, the weights are constant and the two coincide.
+
+\subsection{Exact Boundary Reduction}
+\label{sec:decomposition}
+
+Write $\bm r_z=(r_i)_{i\in\calU_z}$ for the decoded selections held by zone $z$. The objective splits by~\eqref{eq:local-utility} and feasibility splits by~\eqref{eq:factorization}, so once the copies are forced to agree, the product of the zone-local laws~\eqref{eq:gibbs-local} reproduces the exponential weight $e^{\lambda J}$ on $\calF$ up to a constant. The global law under the equality factors is therefore
+\begin{equation}
+\label{eq:zone-gibbs}
+p(\bm r)\propto
+\prod_{z\in\calZ}p_z(\bm r_z)
+\prod_{i\in\calB}
+E_i\!\left((r_i^{(z)})_{z:\,i\in\calU_z}\right).
+\end{equation}
+Zone $z$ eliminates its internal UE selections and retains the joint distribution of the UEs it shares with other zones:
+\begin{equation}
+\label{eq:boundary-factor}
+p_z^{\mathrm{b}}(\bm s)=
+\sum_{\substack{\bm r_z\in\calF_z:\\\bm r_{\calB_z}=\bm s}}
+p_z(\bm r_z).
+\end{equation}
+This marginalization sums utility-weighted probability mass, not utility values. Every boundary copy remains defined on the full domain $\calV_i$; restricting it to $\calV_i\cap\calR_z$ would generally give incompatible supports across zones.
+
+\begin{proposition}[Exact global boundary law]
+\label{prop:boundary}
+After the equality factors identify all copies of a boundary UE with one shared variable, the global boundary distribution is
+\begin{equation}
+\label{eq:boundary-law}
+p_{\calB}(\bm r_{\calB})\propto
+\prod_{z\in\calZ}p_z^{\mathrm{b}}(\bm r_{\calB_z}).
+\end{equation}
+Replacing each zone by~\eqref{eq:boundary-factor} loses no information about the boundary law. Conditioned on $\bm r_{\calB}$, the internal variables of distinct zones are independent.
+\end{proposition}
+The derivation and normalization are given in Appendix~\ref{app:boundary-proof}. The boundary reduction and mathematical marginalization are exact; finite-shot estimation has not yet entered.
+
+Two multiplicative layers have now been used and both are exact. Inside a zone, the controlled rotations realize the exponential local-utility weight in~\eqref{eq:local-exp}. Across zones, the product of the resulting zone-local laws represents the additive global utility, by~\eqref{eq:zone-gibbs}. These are the same composability requirement of Section~\ref{sec:factorization} applied at two levels of one decomposition, and they are equalities rather than approximations precisely because~\eqref{eq:local-utility} and~\eqref{eq:factorization} are exact. The product that appears next, in~\eqref{eq:belief}, is of a different kind: it combines finite-sample estimates held by overlapping zones, and it is approximate for reasons unrelated to the factorization. The distinction is maintained for the remainder of the section.
+
+\subsection{Confidence-Ordered Decimation}
+\label{sec:reconciliation}
+
+By~\eqref{eq:accepted-state} the accepted branch carries amplitude $\sqrt{p_z}$ on each strictly feasible local assignment, so one accepted measurement is one draw from $p_z$ and the zones may run their sampling stages concurrently and in any order. Each zone performs one local sampling stage producing $K_z$ accepted draws from $p_z$, retains their boundary coordinates, and reports the joint sample list $\calS_z=\{\bm s_{z,k}\}_{k=1}^{K_z}$. The report depends on the zone alone, so it is produced once and carried unchanged into the classical stage below. The operational flow is
+\begin{equation}
+\label{eq:decimation-map}
+\boxed{
+\begin{gathered}
+\{\calS_z\}_{z\in\calZ}
+\xrightarrow{\ \substack{\text{count inside}\\\text{each zone}}\ }
+\{\pi_{z,i}\}
+\xrightarrow{\ \substack{\text{multiply}\\\text{across zones}}\ }
+\{b_i\}\\[8pt]
+\{b_i\}
+\xrightarrow{\ \substack{\text{rank by }\delta,\ \text{fix one,}\\\text{filter}}\ }
+\widehat{\bm r}_{\calB}
+\end{gathered}}
+\end{equation}
+Every arrow is classical work on the retained lists; no zone circuit is executed anywhere along the chain. The first arrow counts, the second forms the consensus, and the third is the loop that commits one boundary UE per pass, ordered by the confidence score $\delta$ defined below. The single-UE marginal and the product consensus belief are computed directly from the retained lists:
+\begin{equation}
+\label{eq:belief}
+\begin{aligned}
+\pi_{z,i}(r)
+&=
+\frac{\left|\left\{\bm s\in\calS_z:s_i=r\right\}\right|}{|\calS_z|},\\
+b_i(r)
+&\propto
+\prod_{z:\,i\in\calB_z}\pi_{z,i}(r),
+\qquad
+\sum_{r\in\calV_i}b_i(r)=1.
+\end{aligned}
+\end{equation}
+The quantity $\pi_{z,i}$ is a marginal of a local joint distribution, not a local optimum. The product $b_i$ coincides with the exact single-UE marginal of~\eqref{eq:boundary-law} when every zone containing $i$ satisfies $\calB_z=\{i\}$, so that $\pi_{z,i}$ already summarizes everything that zone can contribute about $i$. When such a zone holds further boundary UEs, its marginal reflects its own view of those UEs while the views held by their other zones are not incorporated, and $b_i$ is then a one-pass consensus estimate rather than the exact marginal. Cut-vertex structure alone is not sufficient for exactness. The neglected information is not discarded: correlations among several boundary UEs remain in the joint lists $\calS_z$ rather than in the product of single-UE marginals, and they re-enter through the conditioning performed after each commitment below.
+
+For an uncommitted UE, the default confidence is the normalized entropy score
+\begin{equation}
+\label{eq:decimation}
+\delta_i=1-\frac{H(b_i)}{\log|\calV_i|},
+\end{equation}
+which is one when the belief names a single candidate and zero when it is flat; the top-two probability gap is an alternative. The third arrow of~\eqref{eq:decimation-map} selects the most confident uncommitted UE, fixes it to its highest-belief RB, filters every adjacent retained joint-sample list on that value, recomputes only the affected marginals and beliefs, and repeats until every boundary UE is fixed. It ends after at most $|\calB|$ irreversible decisions, and the local quantum solvers are not re-executed along the way.
+
+The exact operation is the marginalization in~\eqref{eq:boundary-factor}; the heuristic element enters when finite-shot marginal estimates are converted into irreversible confidence-ordered commitments. Early commitments can therefore create an optimality gap even though each retained local sample is strictly feasible. Once all equality factors are resolved, the surviving local selections assemble into a globally feasible assignment by~\eqref{eq:factorization}.
+
+If conditioning reduces a retained list below $K_{\min}$ in effective sample size, only the affected zone is re-sampled with the current commitments pinned in state preparation. This happens only on sample exhaustion. Pinning changes state-preparation parameters and fixed register values; it does not recompile the constraint topology. Appendix~\ref{app:decimation} gives the step-by-step specification.
+
+% =====================================================================
+\section{Evaluation}
+\label{sec:eval}
+
+\subsection{Implementation}
+\label{sec:eval-impl}
+
+The circuit is implemented in Qiskit \cite{qiskit}. Each UE codebook supplies the multi-control masks for candidate RBs and owner APs; owner-local utilities determine the angles in~\eqref{eq:theta}; and zone capacities determine the comparator thresholds. Exact statevector execution first verifies the conditional distribution~\eqref{eq:conditional-distribution}. Noisy simulation and hardware execution then use the same transpiled constraint topology with readout mitigation and noise-aware placement.
+
+\subsection{Validation Protocol}
+\label{sec:eval-protocol}
+
+The implementation is validated at four levels.
+\begin{enumerate}
+ \item \emph{Strictness:} every accepted state must satisfy all constraints in~\eqref{eq:joint-problem}, including assignments with simultaneous RB and AP violations.
+ \item \emph{Distributional correctness:} the measured accepted histogram is compared with the classical local law in~\eqref{eq:gibbs-local} using total-variation distance and marginal error.
+ \item \emph{Execution-exponent selection:} for each zone, the acceptance mass $\mu_z(\lambda_z)$ and the expected shot count $K_z/P_z(k)$ determine the largest affordable $\lambda_z$. This is a hardware-budget measurement and is not scored on solution quality; the target exponent is not chosen here.
+ \item \emph{Common-exponent reconstruction:} the sweep over the target exponent $\beta$ is carried out classically on the recorded pairs $(\bm s^{(k)},J_z^{(k)})$ by~\eqref{eq:reweight}, without re-executing any circuit. The reported quantities are the total-variation distance between the reconstructed and reference boundary laws, the boundary disagreement rate, and $\min_z\widetilde{K}_z$, which bounds how far the sweep may be extended from a fixed set of executions.
+ \item \emph{Distributed consistency:} boundary-distribution error, equality disagreement, exception re-sampling stages beyond the initial stage, and the final utility ratio against the centralized strict optimum are measured as functions of boundary density.
+\end{enumerate}
+Fig.~\ref{fig:exp} reports these checks across statevector execution, noisy simulation, and hardware.
+
+\begin{figure}[!t]
+\centering
+% \figph[6cm]{[Fig.~7 placeholder] Experimental validation: measured accepted histogram vs. the classical local law; a $\lambda$ sweep of optimum-hit rate, acceptance mass, and effective sample size; and distributed consistency vs. boundary density.}
+\includegraphics[width=\columnwidth]{fig/fig7}
+\caption{Validation results across statevector, noisy simulation, and hardware.}
+\label{fig:exp}
+\end{figure}
+
+% -----------------------------------
+% TODO(submission): the numerical results of the pre-revision manuscript
+% were produced for separate binary association and intra-cell
+% allocation instances under the previous product rotation. They do
+% not validate the joint variable model or the exponential weighting
+% of (11), and must be regenerated before submission; they must not be
+% cited as evidence for the revised system. The retained experimental
+% code can still serve as an oracle and transpilation baseline once
+% its state encoding, utility angles, and accepted-histogram
+% postprocessing are replaced.
+% -----------------------------------
+
+The distributed evaluation varies zone size, candidate degree $|\calV_i|$, boundary density $|\calB|/|\calU|$, AP capacities, target exponent $\beta$, and accepted-draw budget $K_z$. The execution exponents $\{\lambda_z\}$ are not swept independently: each is set by its zone's shot budget, and the sweep over $\beta$ is post-processing on a fixed set of executions. Baselines include local hard-argmax exchange, scalar-preference exchange, top-$\kappa$ candidate exchange, and the proposed retained joint-sample list under the same zone partition. This comparison separates gains from strict local sampling, retained boundary correlations, and additional communication volume.
+
+\subsection{Quantum Circuit Design}
+\label{sec:complexity}
+
+The coverage-graph size $D$ was defined before~\eqref{eq:feasible}. A zone evaluates only the candidate edges of the UEs it concerns, so let $D_z=\sum_{i\in\calU_z}|\calV_i|$ be the zone-local edge count, and let
+\begin{equation}
+\label{eq:lmax}
+\ell_{\max}=\max_i\left\lceil\log_2|\calV_i|\right\rceil.
+\end{equation}
+Every admissible UE-RB edge participates in one RB match and one AP-owner accumulation. With approximate-QFT adders and standard multi-control decompositions, one compute-mark-uncompute pass has
+\begin{equation}
+\label{eq:tcount}
+T_{\mathrm{count},z}=
+O\!\left(D_z(\ell_{\max}+\log N_z)\right).
+\end{equation}
+Here $D_z$ counts the candidate edges the zone evaluates, $\ell_{\max}$ is the candidate-code matching width, and $\log N_z$ is the load-counter width of Section~\ref{sec:encoding}. A width-minimal serial implementation has depth of the same order; $s$ counters reduce the accumulation component approximately by $s$ at $s$ times the counter workspace.
+
+The state width of zone $z$ is $Q_z$ from~\eqref{eq:state-width}. A direct local implementation additionally uses $N_z$ cost qubits, $N_z$ validity flags, $|\calR_z|+|\calA_z|$ violation flags, one counter, comparator workspace, and one superflag. Flags can be batched to trade recomputation for lower width, but the superflag must logically represent the conjunction of every local constraint outcome. Under bounded candidate degree, $D_z$ grows linearly with $N_z$ and~\eqref{eq:tcount} becomes $O(N_z\log N_z)$. Fig.~\ref{fig:complexity} evaluates this model as $T_{\mathrm{depth}}$ times gate latency and places it against the classical and quantum-search baselines at the same zone size. The local sampler overtakes the classical baseline at $N_z\approx60$, and $s=4$ parallel counters move the crossover to $N_z\approx30$. Both crossovers lie inside the zone sizes that the bounded-density regime of Section~\ref{sec:hybrid-eval} admits, so the local advantage is available at the scale the decomposition actually produces.
+
+Runtime is governed by coverage-graph size rather than by the number of UEs alone. Each measurement therefore reports $(|\calU|,D,|\calR|,|\calA|)$, transpiled two-qubit depth, amplification count, and physical shots used to obtain the target number of accepted draws. Classical baselines solve the same coupled problem: min-cost flow where the instance reduces to it and integer programming for the general candidate-set model.
+
+\begin{figure}[!t]
+\centering
+% \figph[5.5cm]{[Fig.~8 placeholder] Estimated resource scaling: compute-mark-uncompute gate count and zone-local width vs. coverage-graph size, candidate degree, and boundary density.}
+\includegraphics[width=\columnwidth]{fig/fig8}
+\caption{Zone-local runtime of the local sampler against zone size, modeled as $T_{\mathrm{depth}}$ times gate latency. The enhanced curve applies the $s=4$ parallel accumulation of Section~\ref{sec:complexity}.}
+\label{fig:complexity}
+\end{figure}
+
+\subsection{Protocol Resources}
+\label{sec:hybrid-eval}
+
+Each zone transmits one distribution-valued report containing $K_z|\calB_z|$ code symbols, or $\sum_{i\in\calB_z}\lceil\log_2|\calV_i|\rceil$ bits per retained sample, together with one recorded local utility $J_z^{(k)}$ per retained sample. The utility field is what allows the reconstruction of Section~\ref{sec:reweighting} to be performed at the merge point, and it adds one scalar per sample to a payload that already grows with $|\calB_z|$. One sampling stage is not one shot: obtaining $K_z$ accepted draws requires multiple physical executions, with expected shot count approximately $K_z/P_z(k)$ when shots are independent. The default protocol has one initial sampling stage per zone. Additional stages occur only in zones whose conditioned retained lists fall below $K_{\min}$.
+
+Under bounded zone density and bounded candidate degree, the largest $Q_z$ is independent of the total number of zones, while report size grows with the overlap size and candidate-domain width. A scalar preference can be derived from a marginal, but it generally discards multimodality, confidence, and the multi-UE correlations that the filtering in Appendix~\ref{app:decimation} uses.
+
+The target exponent $\beta$ is selected for merge quality rather than for local concentration, and both extremes degrade it. A small $\beta$ leaves every zone report close to uniform over $\calF_z$, so the consensus in~\eqref{eq:belief} carries little signal and the decimation order is driven by sampling noise. A large $\beta$ makes each report nearly deterministic, so zones tend to insist on incompatible values, $b_i$ concentrates for reasons that reflect local dominance rather than agreement, and the protocol degenerates toward the hard-argmax exchange used as a baseline above. The retained joint list is what distinguishes the method from that baseline, and it is informative only in the intermediate range. An operating point is therefore reported together with $\min_z\widetilde{K}_z(\lambda)$, which bounds how far that range can be explored from a given set of executions, and with the boundary disagreement rate, which is the quantity the exponent is actually chosen to minimize.
+
+% =====================================================================
+{\color{violet}
+\section{Conclusion}
+\label{sec:conclusion}
+
+This paper proposed a unified quantum design for scalable network management through unified modeling, oracle design, and distributed coordination. Joint AP–RB assignment demonstrates how coupled network management tasks can be represented within a common optimization model and solved through a feasibility-preserving quantum oracle without penalty-based constraint formulations. The distributed design extends the computation beyond the capacity of individual NISQ processors by coordinating local quantum optimization while confining additional quantum execution to locally affected zones. Gate-level complexity analysis further indicates that the local quantum sampler becomes effective at the zone sizes naturally produced under bounded network density.
+
+The proposed design is implemented in Qiskit and validated through state vector analysis, noisy simulation, quantum hardware execution, and distributed protocol evaluation. The results confirm strict feasibility, accurate distribution reconstruction, scalable distributed coordination, and practical execution under present-day quantum constraints. Beyond AP–RB assignment problem, the proposed unified modeling, oracle design, and distributed coordination establish a scalable computational foundation for transforming a broad class of network management problems into unified quantum optimization, providing a practical step toward universal quantum network management.
+}
+
+% This paper formulated joint AP–RB assignment using the RB choice as the decision and the serving AP as its derived owner association. The zone-local quantum circuit enforces strict UE, RB, and AP feasibility through one superflag and produces a utility-weighted joint distribution over feasible assignments, rather than only a preferred point. Exponential utility-loss rotations preserve the ordering of the original additive objective, while amplitude amplification changes only the probability of entering the accepted branch. A gate-level cost model places the crossover with the classical baseline at a zone size that the bounded-density regime already admits, so the local sampler is efficient at the scale on which it is
+% deployed.
+
+% The distributed construction uses that distributional output directly. Internal variables are marginalized exactly to obtain each zone's boundary joint distribution, and one local sampling stage per zone supplies retained joint samples without incoming inter-zone messages. Confidence-ordered decimation then conditions those samples after each boundary decision. The boundary reduction is exact; finite-shot estimation and irreversible sequential commitment account for approximation and possible optimality loss. Re-sampling is confined to an affected zone only when conditioning exhausts its retained samples.
+
+% TODO(submission): previous separate association/allocation results and
+% N-only runtime fits must be regenerated for the joint coverage graph
+% and evaluated for both distributional accuracy and boundary-consensus
+% quality before this conclusion can cite numbers.
+
+% =====================================================================
+\appendices
+\section{Exponential Utility Weight and Rotation Realization}
+\label{app:exponential}
+
+\subsection{Uniqueness of the Exponential Weight}
+
+Fix $M\ge2$. Let $f:[0,\infty)\to(0,\infty)$ be continuous and suppose that the product of the local weights depends on the local utilities only through their sum:
+\[
+\prod_{m=1}^{M}f(J_m)
+=
+F\!\left(\sum_{m=1}^{M}J_m\right),
+\]
+where $F$ is strictly increasing. Setting all but two arguments to zero gives
+\[
+f(J_1)f(J_2)f(0)^{M-2}=F(J_1+J_2),
+\]
+whereas setting one argument to $J_1+J_2$ and all remaining arguments to zero gives
+\[
+f(J_1+J_2)f(0)^{M-1}=F(J_1+J_2).
+\]
+Equating the two and defining $\widetilde f=f/f(0)$ yields
+\[
+\widetilde f(J_1)\widetilde f(J_2)
+=
+\widetilde f(J_1+J_2).
+\]
+The continuous positive solutions are $\widetilde f(J)=e^{\lambda J}$. Hence
+\[
+f(J)=f(0)e^{\lambda J},
+\]
+and strict monotonicity of $F$ requires $\lambda>0$. Therefore, apart from an argument-independent factor that disappears under normalization, the shared exponential weight is the unique multiplicative form that depends only on the additive global utility.
+
+\subsection{Realization by Controlled Rotations}
+
+For the rotation parameters in~\eqref{eq:theta},
+\[
+P(\mathrm{cost}_i=0\mid r_i=r)
+=
+\cos^2\!\left(\frac{\theta_{z,i,r}}{2}\right)
+=
+g_{z,i}(r).
+\]
+Conditioned on a complete local assignment $\bm r_z$, the cost-qubit
+outcomes factorize across UEs. Hence
+\[
+\begin{aligned}
+g_z(\bm r_z)
+&=
+\prod_{i\in\calU_z}g_{z,i}(r_i)\\
+&=
+\prod_{i\in\calU_z}
+\exp[-\lambda(u_{z,i}^{\max}-u_{i,r_i}^{(z)})]\\
+&=
+\exp\!\left[-\lambda
+\sum_{i\in\calU_z}u_{z,i}^{\max}\right]
+\exp[\lambda J_z(\bm r_z)]\\
+&=
+\kappa_z\exp[\lambda J_z(\bm r_z)],
+\end{aligned}
+\]
+where
+\[
+\kappa_z=
+\exp\!\left[-\lambda
+\sum_{i\in\calU_z}u_{z,i}^{\max}\right].
+\]
+This gives~\eqref{eq:local-exp}. Since $\kappa_z>0$ is independent of
+$\bm r_z$ and $\lambda>0$, the resulting weight strictly preserves the
+ordering of the original additive zone utility.
+
+\section{Exact Boundary Reduction}
+\label{app:boundary-proof}
+
+Resolving the equality factors in~\eqref{eq:zone-gibbs} replaces the copies $\{r_i^{(z)}\}_{z:i\in\calU_z}$ of each boundary UE by one shared variable $r_i$. Let $\bm r_{I_z}$ denote the internal variables of zone $z$. For a fixed boundary assignment, the unnormalized marginal is
+\[
+\begin{aligned}
+\widetilde p_{\calB}(\bm r_{\calB})
+&=
+\sum_{\{\bm r_{I_z}\}_z}
+\prod_{z\in\calZ}
+p_z(\bm r_{I_z},\bm r_{\calB_z})\\
+&=
+\prod_{z\in\calZ}
+\sum_{\bm r_{I_z}}
+p_z(\bm r_{I_z},\bm r_{\calB_z})\\
+&=
+\prod_{z\in\calZ}p_z^{\mathrm{b}}(\bm r_{\calB_z}).
+\end{aligned}
+\]
+Normalizing by $Z_{\calB}=\sum_{\bm r_{\calB}}\widetilde p_{\calB}(\bm r_{\calB})$ gives~\eqref{eq:boundary-law}. For any boundary assignment with positive mass,
+\[
+p(\{\bm r_{I_z}\}_z\mid\bm r_{\calB})
+=
+\prod_{z\in\calZ}
+\frac{p_z(\bm r_{I_z},\bm r_{\calB_z})}
+{p_z^{\mathrm{b}}(\bm r_{\calB_z})},
+\]
+which proves the conditional independence of zone-internal variables. The reduction is therefore exact before the boundary distributions are replaced by finite-sample estimates.
+
+\section{Decimation Step by Step}
+\label{app:decimation}
+
+The index $t$ orders the $|\calB|$ decisions of a single pass; the local quantum solvers are not re-executed as $t$ advances.
+
+Initialize the commitment map and retained lists as
+\[
+\Pi_0=\varnothing,
+\qquad
+\calS_z^{(0)}=\calS_z.
+\]
+At position $t$, for each uncommitted boundary UE with a nonempty adjacent retained list, compute
+\[
+\pi_{z,i}^{(t)}(r)=
+\frac{\left|\left\{\bm s\in\calS_z^{(t)}:s_i=r\right\}\right|}
+{|\calS_z^{(t)}|},
+\]
+\[
+b_i^{(t)}(r)=
+\frac{\displaystyle\prod_{z:\,i\in\calB_z}\pi_{z,i}^{(t)}(r)}
+{\displaystyle\sum_{r'\in\calV_i}\prod_{z:\,i\in\calB_z}\pi_{z,i}^{(t)}(r')}.
+\]
+Select and commit
+\[
+\begin{aligned}
+i_t
+&=\arg\max_{i\ \text{uncommitted}}\ \delta_i^{(t)},\\
+r_{i_t}^{\star}
+&=\arg\max_{r\in\calV_{i_t}}b_{i_t}^{(t)}(r).
+\end{aligned}
+\]
+\[
+\Pi_{t+1}=\Pi_t\cup\{i_t\mapsto r_{i_t}^{\star}\}.
+\]
+The adjacent joint-sample lists are filtered irreversibly:
+\[
+\calS_z^{(t+1)}=
+\begin{cases}
+\{\bm s\in\calS_z^{(t)}:s_{i_t}=r_{i_t}^{\star}\},
+&i_t\in\calB_z,\\
+\calS_z^{(t)},
+&i_t\notin\calB_z.
+\end{cases}
+\]
+For reference, the normalized empirical boundary distribution represented by the initial list is
+\[
+\widehat p_z^{\mathrm{b}}(\bm s)=
+\frac{\left|\left\{\bm s'\in\calS_z:\bm s'=\bm s\right\}\right|}
+{|\calS_z|}.
+\]
+The decimation stops after all boundary UEs have been fixed, and therefore uses at most $|\calB|$ positions.
+
+When zones execute at exponents $\lambda_z$ below the common $\lambda$, every count above is replaced by the corresponding weighted sum with the weights of~\eqref{eq:reweight}, so that
+\[
+\pi_{z,i}^{(t)}(r)=
+\frac{\sum_{k:\,\bm s^{(k)}\in\calS_z^{(t)},\,s_i^{(k)}=r}w_z^{(k)}}
+{\sum_{k:\,\bm s^{(k)}\in\calS_z^{(t)}}w_z^{(k)}},
+\]
+and the belief $b_i^{(t)}$ is formed from these weighted marginals unchanged. The filtering step is applied to the weighted list, each surviving sample retaining its weight, so conditioning and reweighting commute. The exhaustion test is stated on the effective sample size rather than on the cardinality: if $\widetilde{K}_z^{(t)}<K_{\min}$ after filtering, only zone $z$ is re-sampled with $\Pi_t$ pinned in state preparation, and the other zones keep their lists. This test is the stricter one, since $\widetilde{K}_z^{(t)}\le|\calS_z^{(t)}|$ with equality only for uniform weights, and it detects the case in which a nominally long list is dominated by a few heavily weighted draws.
+
+A finite list can assign zero weight to a candidate that other zones support, and the product form of $b_i$ would then veto that candidate outright while the resulting spurious concentration would raise its confidence score. The implementation therefore forms $\pi_{z,i}^{(t)}$ with a pseudo-count $\alpha>0$ added to every candidate in $\calV_i$ before normalization, and excludes from the selection in the confidence ordering any UE whose adjacent lists have fallen below the exhaustion threshold.
+
+% =====================================================================
+\section*{Acknowledgment}
+% This work was supported by the National Research Foundation of
+% Korea (NRF) grant funded by the Korea government (MSIT)
+% (2022R1A5A1027646 and RS-2025-00563388).
+% =====================================================================
+\begin{thebibliography}{60}
+
+% -- prior version (delta anchor) --
+\bibitem{jang2025cqf}
+Y. H. Jang, J. Hwang, W. Lee, H. S. Kim, and S. H. Lee, ``A unified
+quantum framework for assignment optimization in network
+administration,'' \emph{IEEE Commun. Mag.}, 2025.
+% FIXME(submission): insert final volume, issue, pages, and DOI from
+% the published IEEE record.
+
+% -- network administration context --
+\bibitem{lee2024node}
+S. H. Lee \emph{et al.}, ``A node-cooperative universal framework
+for wireless network management automation,'' \emph{IEEE Commun.
+Mag.}, vol. 62, no. 6, pp. 50-57, Jun. 2024.
+
+\bibitem{masaracchia2023dt}
+A. Masaracchia, V. Sharma, M. Fahim, O. A. Dobre, and T. Q. Duong,
+``Digital twin for open RAN: Toward intelligent and resilient 6G
+radio access networks,'' \emph{IEEE Commun. Mag.}, vol. 61, no. 11,
+pp. 112-118, Nov. 2023.
+
+\bibitem{wang2022quantum6g}
+C. Wang and A. Rahman, ``Quantum-enabled 6G wireless networks:
+Opportunities and challenges,'' \emph{IEEE Wireless Commun.},
+vol. 29, no. 1, pp. 58-69, Feb. 2022.
+
+\bibitem{yi2025towards}
+W. Yi \emph{et al.}, ``Towards seamless 6G and AI/ML convergence:
+Architectural enhancements and security challenges,'' \emph{IEEE
+Netw.}, vol. 39, no. 4, pp. 157-165, 2025.
+
+\bibitem{chowdhary2022intent}
+A. Chowdhary, A. Sabur, N. Vadnere, and D. Huang, ``Intent-driven
+security policy management for software-defined systems,''
+\emph{IEEE Trans. Netw. Service Manag.}, vol. 19, no. 4,
+pp. 5208-5223, Dec. 2022.
+
+% -- quantum algorithm primary sources --
+\bibitem{nielsen2011}
+M. A. Nielsen and I. L. Chuang, \emph{Quantum Computation and
+Quantum Information}. Cambridge, U.K.: Cambridge Univ. Press, 2011.
+
+\bibitem{grover1996}
+L. K. Grover, ``A fast quantum mechanical algorithm for database
+search,'' in \emph{Proc. 28th ACM Symp. Theory Comput. (STOC)},
+1996, pp. 212-219.
+
+\bibitem{boyer1998}
+M. Boyer, G. Brassard, P. H\o yer, and A. Tapp, ``Tight bounds on
+quantum searching,'' \emph{Fortschr. Phys.}, vol. 46, no. 4-5,
+pp. 493-505, 1998.
+
+\bibitem{durr1996}
+C. D\"urr and P. H\o yer, ``A quantum algorithm for finding the
+minimum,'' arXiv:quant-ph/9607014, 1996.
+
+\bibitem{brassard2002}
+G. Brassard, P. H\o yer, M. Mosca, and A. Tapp, ``Quantum amplitude
+amplification and estimation,'' \emph{Contemp. Math.}, vol. 305,
+pp. 53-74, 2002.
+
+\bibitem{farhi2014}
+E. Farhi, J. Goldstone, and S. Gutmann, ``A quantum approximate
+optimization algorithm,'' arXiv:1411.4028, 2014.
+
+\bibitem{lucas2014}
+A. Lucas, ``Ising formulations of many NP problems,''
+\emph{Front. Phys.}, vol. 2, p. 5, 2014.
+
+\bibitem{kadowaki1998}
+T. Kadowaki and H. Nishimori, ``Quantum annealing in the transverse
+Ising model,'' \emph{Phys. Rev. E}, vol. 58, no. 5, pp. 5355-5363,
+Nov. 1998.
+
+\bibitem{botsinis2019}
+P. Botsinis \emph{et al.}, ``Quantum search algorithms for wireless
+communications,'' \emph{IEEE Commun. Surveys Tuts.}, vol. 21, no. 2,
+pp. 1209-1242, 2nd Quart. 2019.
+
+\bibitem{biamonte2017}
+J. Biamonte \emph{et al.}, ``Quantum machine learning,''
+\emph{Nature}, vol. 549, no. 7671, pp. 195-202, 2017.
+
+\bibitem{ngoenriang2023}
+N. Ngoenriang \emph{et al.}, ``DQC\textsuperscript{2}O: Distributed
+quantum computing for collaborative optimization in future
+networks,'' \emph{IEEE Commun. Mag.}, vol. 61, no. 5, pp. 188-194,
+May 2023.
+
+\bibitem{kim2021heuristic}
+M. Kim \emph{et al.}, ``Heuristic quantum optimization for 6G
+wireless communications,'' \emph{IEEE Netw.}, vol. 35, no. 4,
+pp. 8-15, Jul./Aug. 2021.
+
+\bibitem{seo2022}
+Y. Seo, Y. Kang, and J. Heo, ``Quantum search algorithm for
+weighted solutions,'' \emph{IEEE Access}, vol. 10,
+pp. 16209-16224, 2022.
+
+\bibitem{fan2022hybrid}
+L. Fan \emph{et al.}, ``Hybrid quantum-classical computing for
+future network optimization,'' \emph{IEEE Netw.}, vol. 36, no. 5,
+pp. 72-76, Sep./Oct. 2022.
+
+% -- oracle-based search over constrained binary domains --
+\bibitem{gilliam2021gas}
+A. Gilliam, S. Woerner, and C. Gonciulea, ``Grover adaptive search
+for constrained polynomial binary optimization,'' \emph{Quantum},
+vol. 5, p. 428, Apr. 2021.
+
+\bibitem{fujiwara2025gas}
+S. Fujiwara and N. Ishikawa, ``Grover adaptive search with spin
+variables,'' \emph{IEEE Trans. Quantum Eng.}, 2025,
+doi: 10.1109/TQE.2025.3595910.
+% FIXME(submission): confirm final volume and article number.
+
+\bibitem{wilkening2025qtg}
+S. Wilkening, A.-I. Lefterovici, L. Binkowski, M. Perk, S. P.
+Fekete, and T. J. Osborne, ``A quantum algorithm for solving 0-1
+knapsack problems,'' \emph{npj Quantum Inf.}, vol. 11, art. no.
+146, Aug. 2025.
+
+\bibitem{wilkening2025qkp}
+S. Wilkening \emph{et al.}, ``A quantum search method for quadratic
+and multidimensional knapsack problems,'' arXiv:2503.22325, 2025.
+% FIXME(submission): check for a journal version.
+
+% -- quantum optimization for network management --
+\bibitem{narottama2022qnn}
+B. Narottama and S. Y. Shin, ``Quantum neural networks for resource
+allocation in wireless communications,'' \emph{IEEE Trans. Wireless
+Commun.}, vol. 21, no. 2, pp. 1103-1116, Feb. 2022.
+
+\bibitem{ansere2024qdrl}
+J. A. Ansere, E. Gyamfi, V. Sharma, H. Shin, O. A. Dobre, and
+T. Q. Duong, ``Quantum deep reinforcement learning for dynamic
+resource allocation in mobile edge computing-based IoT systems,''
+\emph{IEEE Trans. Wireless Commun.}, vol. 23, no. 6,
+pp. 6221-6233, Jun. 2024.
+
+\bibitem{ansere2026tnse}
+J. A. Ansere, S. C. Prabhashana, N. Simmons, O. A. Dobre, H. Shin,
+and T. Q. Duong, ``Quantum deep deterministic policy gradient for
+digital twin-enabled semantic IoV networks,'' \emph{IEEE Trans.
+Netw. Sci. Eng.}, vol. 13, pp. 54-66, 2026.
+
+\bibitem{zhang2024tnse}
+Y. Zhang, Y. Gong, L. Fan, Y. Wang, Z. Han, and Y. Guo,
+``Quantum-assisted joint caching and power allocation for
+integrated satellite-terrestrial networks,'' \emph{IEEE Trans.
+Netw. Sci. Eng.}, vol. 11, no. 6, pp. 5163-5174, Nov./Dec. 2024.
+
+\bibitem{wei2024tnse}
+X. Wei, L. Fan, Y. Guo, Y. Gong, Z. Han, and Y. Wang, ``Hybrid
+quantum-classical Benders' decomposition for federated learning
+scheduling in distributed networks,'' \emph{IEEE Trans. Netw. Sci.
+Eng.}, vol. 11, no. 6, pp. 6038-6051, Nov./Dec. 2024.
+
+\bibitem{zhang2024beamforming}
+J. Zhang, G. Zheng, T. Koike-Akino, K.-K. Wong, and F. A. Burton,
+``Hybrid quantum-classical neural networks for downlink
+beamforming optimization,'' \emph{IEEE Trans. Wireless Commun.},
+vol. 23, no. 11, pp. 16498-16512, Nov. 2024.
+
+\bibitem{sharma2026tnse}
+A. Sharma, K. Singh, A. Paul, K. Agrawal, K. Dev, and S. Biswas,
+``Quantum-driven resource optimization for full-duplex
+STAR-RIS-aided NOMA-ISAC with constraint projection,''
+\emph{IEEE Trans. Netw. Sci. Eng.}, vol. 13, pp. 6827-6842, 2026.
+
+% -- circuit primitives (code-enforced citations) --
+\bibitem{draper2000}
+T. G. Draper, ``Addition on a quantum computer,''
+arXiv:quant-ph/0008033, 2000.
+
+\bibitem{coppersmith1994}
+D. Coppersmith, ``An approximate Fourier transform useful in quantum
+factoring,'' IBM Res. Rep. RC19642, 1994; arXiv:quant-ph/0201067.
+
+\bibitem{maslov2016}
+D. Maslov, ``Advantages of using relative-phase Toffoli gates with
+an application to multiple control Toffoli optimization,''
+\emph{Phys. Rev. A}, vol. 93, p. 022311, 2016.
+
+\bibitem{campbell2019}
+E. Campbell, A. Khurana, and A. Montanaro, ``Applying quantum
+algorithms to constraint satisfaction problems,'' \emph{Quantum},
+vol. 3, p. 167, 2019.
+
+\bibitem{preskill2018}
+J. Preskill, ``Quantum computing in the NISQ era and beyond,''
+\emph{Quantum}, vol. 2, p. 79, 2018.
+
+\bibitem{qiskit}
+Qiskit contributors, ``Qiskit: An open-source framework for quantum
+computing,'' 2023. [Online]. Available: \url{https://qiskit.org}
+
+% -- classical baselines & models --
+\bibitem{kuhn1955}
+H. W. Kuhn, ``The Hungarian method for the assignment problem,''
+\emph{Nav. Res. Logist. Q.}, vol. 2, pp. 83-97, 1955.
+
+\bibitem{tr36873}
+3GPP, ``Study on 3D channel model for LTE,'' TR 36.873, 2017.
+
+% REMOVED in rev.2: li2017temporal (Li et al., Science, 2017).
+% It was the sole support for "per-cell density remains bounded even
+% as the global network grows" in Sec. VII, i.e. for q_local = O(1)
+% in N. That paper concerns controllability of temporal networks and
+% does not establish the claim. The claim is now stated as a
+% deployment assumption. Reinstate only with a reference that
+% actually bounds cellular user density.
+
+% -- artifact --
+\bibitem{cqfrepo}
+``CQF public repository,'' GitHub. [Online]. Available:
+\url{https://github.com/gyh1238/CQF}
+
+% -- rev.2 status: 40 references (was 29).
+%  Still open toward the 55-65 target of checklist item 12:
+%  dynamic-decoupling and readout-mitigation primary sources
+%  (currently claimed in Sec. VI-A with no citation), an integer
+%  comparator reference distinct from the Qiskit manual, a
+%  cellular deployment-density reference (see li2017temporal note
+%  above), and per-row citations should Table I gain an
+%  annealing-hardware or QAOA-network-application row.
+
+\end{thebibliography}
+
+\vskip -2\baselineskip plus -1fil
+
+\begin{IEEEbiographynophoto}
+%[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{fig/jang_yonghun.jpg}}]
+{Yong Hun Jang} %(disclose@korea.ac.kr)
+received the B.S. degree from the Seoul National University of Science and Technology in 2019. He is currently with the School of Electrical Engineering, Korea University, Seoul, South Korea. His research interests include distributed system optimization, computing cluster parallelization and job scheduling, intelligent reflecting surface for wireless communication and their applications.
+\end{IEEEbiographynophoto}
+
+\vskip -2\baselineskip plus -1fil
+
+\begin{IEEEbiographynophoto}
+{Sang Hyun Lee} %(sanghyunlee@korea.ac.kr)
+received the B.S. and M.S. degrees from the Korea Advanced Institute of Science and Technology in 1999 and 2001, respectively, and the Ph.D. degree from the University of Texas at Austin in 2011. He is currently with the School of Electrical Engineering, Korea University, Seoul, Korea. His research interests include communications, designs, and optimizations on wireless applications in high-performance computing.
+\end{IEEEbiographynophoto}
+
+\end{document}

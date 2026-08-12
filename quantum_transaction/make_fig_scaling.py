@@ -1,0 +1,194 @@
+"""
+Scaling figure: what stays bounded as the region grows.
+=======================================================
+Growth axis: the region is enlarged at fixed AP spacing, UE density,
+coverage radius and candidate degree, so the *global* problem grows while
+local density does not.  The partitioner then emits more zones of roughly
+constant size rather than larger zones.
+
+Left axis  -- utility of the distributed result as a fraction of the
+              centralized strict optimum (MILP).  Flat means decomposition
+              and boundary coordination cost essentially nothing.
+Right axis -- two-qubit gate count of one compute-mark-uncompute pass:
+              the largest zone-local circuit (bounded) against the single
+              centralized circuit (growing), with the measured Heron2 and
+              Heron3 ceilings for reference.
+
+Together: the centralized circuit leaves the executable region while the
+zone-local circuits stay inside it at unchanged solution quality.  That is
+the scalable-execution claim, with no competing protocol required -- the
+centralized optimum enters only as the denominator.
+
+Usage:  python make_fig_scaling.py [--recollect]
+"""
+
+import argparse
+import os
+import time
+
+import numpy as np
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+from haiq_instance import make_instance, utility_scale
+from haiq_partition import partition_aps
+from haiq_cost import centralized_2q_cost, CEIL_KINGSTON, CEIL_BOSTON, BUDGET_DEFAULT
+from haiq_protocol import run_protocol
+from haiq_reference import solve_centralized
+
+CACHE = "scaling_data.npz"
+G_VALUES = (3, 4, 5, 6, 7, 8, 9)
+SEEDS = tuple(range(6))
+BETA = 1.5
+K_ACCEPT = 400
+
+
+def collect(verbose=True):
+    rec = []
+    skipped = 0
+    for g in G_VALUES:
+        for s in SEEDS:
+            t0 = time.time()
+            inst = make_instance(g=g, seed=s)
+            opt, _, ok = solve_centralized(inst)
+            if not ok:
+                skipped += 1
+                if verbose:
+                    print(f"  g={g} seed={s}: infeasible instance, skipped")
+                continue
+            part = partition_aps(inst)
+            res = run_protocol(inst, part, beta=BETA, ubar=utility_scale(inst),
+                               k_accept=K_ACCEPT, rng=np.random.default_rng(1000 + s))
+            cen = centralized_2q_cost(inst)
+            rec.append((g, s, inst.n_ue, res["n_active_zones"],
+                        100.0 * res["utility"] / opt,
+                        max(st["n2q"] for st in part.stats),
+                        cen["n2q"],
+                        max(st["n_qubits"] for st in part.stats),
+                        cen["n_qubits"],
+                        100.0 * part.boundary_density,
+                        res["comm_bits"], res["exceptions"],
+                        float(res["feasible"]), res["max_rounds"],
+                        res["attempts"]))
+            if verbose:
+                print(f"  g={g} seed={s}: UEs={inst.n_ue:3d} zones={res['n_active_zones']:2d} "
+                      f"ratio={rec[-1][4]:.2f}% feas={res['feasible']} "
+                      f"({time.time()-t0:.1f}s)")
+    arr = np.array(rec, dtype=float)
+    np.savez(CACHE, data=arr, skipped=skipped)
+    return arr, skipped
+
+
+def load():
+    if not os.path.exists(CACHE):
+        return collect()
+    z = np.load(CACHE)
+    return z["data"], int(z["skipped"])
+
+
+COL = dict(ratio="#1f6fb4", zone="#2e8b57", cen="#c1440e", ceil="#8a8a8a")
+
+
+def plot(arr, skipped):
+    cols = dict(g=0, seed=1, n_ue=2, zones=3, ratio=4, zone2q=5, cen2q=6,
+                zoneq=7, cenq=8, bdens=9, bits=10, exc=11, feas=12, rounds=13,
+                attempts=14)
+    gs = np.unique(arr[:, cols["g"]])
+
+    def agg(key):
+        m, lo, hi, x = [], [], [], []
+        for g in gs:
+            v = arr[arr[:, cols["g"]] == g, cols[key]]
+            m.append(v.mean())
+            lo.append(v.mean() - v.std())
+            hi.append(v.mean() + v.std())
+            x.append(arr[arr[:, cols["g"]] == g, cols["zones"]].mean())
+        return np.array(x), np.array(m), np.array(lo), np.array(hi)
+
+    x, ratio, rlo, rhi = agg("ratio")
+    _, z2q, z2lo, z2hi = agg("zone2q")
+    _, c2q, _, _ = agg("cen2q")
+
+    fig, (ax_c, ax_q) = plt.subplots(
+        2, 1, figsize=(6.9, 6.2), sharex=True,
+        gridspec_kw=dict(height_ratios=[1.25, 1]))
+
+    # ---- (a) circuit cost ------------------------------------------------
+    ax_c.set_yscale("log")
+    ax_c.axhline(CEIL_KINGSTON, color=COL["ceil"], ls=":", lw=1.2)
+    ax_c.axhline(CEIL_BOSTON, color=COL["ceil"], ls="-.", lw=1.2)
+    ax_c.axhline(BUDGET_DEFAULT, color=COL["zone"], ls="--", lw=1.0, alpha=0.6)
+    ax_c.text(x[0], CEIL_KINGSTON * 0.80, "Heron2 half-signal (measured)",
+              ha="left", va="top", fontsize=7, color="#5a5a5a")
+    ax_c.text(x[0], CEIL_BOSTON * 0.80, "Heron3 half-signal (measured)",
+              ha="left", va="top", fontsize=7, color="#5a5a5a")
+    ax_c.text(x[-1], BUDGET_DEFAULT * 1.15, f"partition budget {BUDGET_DEFAULT}",
+              ha="right", va="bottom", fontsize=7, color=COL["zone"])
+
+    ax_c.plot(x, c2q, "s--", color=COL["cen"], ms=5, lw=1.8,
+              label="centralized: one circuit for the whole region")
+    ax_c.fill_between(x, z2lo, z2hi, color=COL["zone"], alpha=0.20, lw=0)
+    ax_c.plot(x, z2q, "o-", color=COL["zone"], ms=5, lw=1.8,
+              label="distributed: largest zone circuit")
+    ax_c.set_ylabel("two-qubit gates\n(one oracle pass)", fontsize=9.5)
+    ax_c.set_ylim(2.5e2, max(c2q) * 4)
+    ax_c.legend(loc="upper left", fontsize=8, framealpha=0.95)
+    ax_c.grid(alpha=0.25, which="both", lw=0.5)
+    ax_c.set_title("Growing the region adds zones, not zone size", fontsize=11)
+
+
+    # ---- (b) solution quality -------------------------------------------
+    ax_q.axhline(100, color="#999999", lw=0.9, ls="-")
+    ax_q.fill_between(x, rlo, rhi, color=COL["ratio"], alpha=0.22, lw=0)
+    ax_q.plot(x, ratio, "^-", color=COL["ratio"], ms=6, lw=2.0,
+              label="distributed utility / centralized strict optimum")
+    ax_q.set_ylim(95, 101)
+    ax_q.set_ylabel("utility vs.\ncentralized optimum  [%]", fontsize=9.5)
+    ax_q.legend(loc="lower left", fontsize=8, framealpha=0.95)
+    ax_q.grid(alpha=0.25, lw=0.5)
+
+    # the growth axis reads in both units: zones produced, and UEs in the region
+    n_ues = [arr[arr[:, cols["g"]] == g, cols["n_ue"]].mean() for g in gs]
+    ax_q.set_xticks(x)
+    ax_q.set_xticklabels([f"{xi:.0f}\n{nu:.0f}" for xi, nu in zip(x, n_ues)],
+                         fontsize=8.5)
+    ax_q.set_xlabel("zones after partitioning  /  UEs in the region",
+                    fontsize=10)
+
+    feas = arr[:, cols["feas"]].mean() * 100
+    fig.text(0.013, 0.055,
+             f"{len(arr)} instances, {len(SEEDS)} seeds per size; shading is one "
+             f"standard deviation (beta={BETA}, K_z={K_ACCEPT})"
+             + (f"; {skipped} globally infeasible instances excluded." if skipped
+                else "."),
+             fontsize=7, color="#555555")
+    fig.text(0.013, 0.022,
+             f"Every accepted assignment satisfies the original constraints; "
+             f"{feas:.0f}% of runs closed on a strictly feasible global assignment.",
+             fontsize=7, color="#555555")
+    fig.subplots_adjust(left=0.135, right=0.98, top=0.925, bottom=0.175,
+                        hspace=0.14)
+    os.makedirs("fig", exist_ok=True)
+    for ext in ("pdf", "png"):
+        fig.savefig(f"fig/fig_scaling.{ext}", dpi=200)
+    print("wrote fig/fig_scaling.pdf and .png")
+
+    # ---- console summary -------------------------------------------------
+    print("\n zones   UEs   ratio%      max zone 2q     centralized 2q   |B|%")
+    for i, g in enumerate(gs):
+        m = arr[:, cols["g"]] == g
+        print(f" {x[i]:5.1f} {arr[m, cols['n_ue']].mean():5.0f}  "
+              f"{ratio[i]:6.2f}+-{arr[m, cols['ratio']].std():4.2f}   "
+              f"{z2q[i]:8.0f}         {c2q[i]:10.0f}   "
+              f"{arr[m, cols['bdens']].mean():5.1f}")
+
+
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--recollect", action="store_true")
+    a = ap.parse_args()
+    if a.recollect and os.path.exists(CACHE):
+        os.remove(CACHE)
+    arr, skipped = load()
+    plot(arr, skipped)

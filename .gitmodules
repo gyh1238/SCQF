@@ -1,0 +1,6 @@
+[submodule "HAIQ"]
+	path = HAIQ
+	url = https://github.com/gyh1238/HAIQ.git
+[submodule "CQF_repo"]
+	path = CQF_repo
+	url = https://github.com/gyh1238/CQF.git
