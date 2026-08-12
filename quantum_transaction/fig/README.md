@@ -225,13 +225,23 @@ strongly coupled, each for its most dependent pair.
   UEs would break an owned RB or AP limit. It carries about a fifth of the
   product's belief and exactly none of the joint's.
 
-**(c3): what losing them costs.** One line per instance, from the utility a
-marginal-only exchange reaches to the utility the retained joint list reaches;
-the thick line is the mean. Everything is held fixed between the two runs —
-sampler, feasibility guard, commitment order — and only the report format
-changes, so the gap is attributable to the format alone.
+**(c3): what losing them costs.** One point per instance. The horizontal axis
+is the utility reached when each zone's marginals are taken once and not
+revisited; the vertical axis is the utility reached when the retained joint
+list is re-conditioned after every commitment. Points above the diagonal are
+instances where keeping the joint list helped. Everything else is held fixed
+between the two runs — sampler, feasibility guard, commitment order — so the
+gap is attributable to the report format alone.
 
-The mean gap is **+1.1 points** of utility. That is worth reading against the
+Worth being precise here, because the panel invites a stronger reading than
+it supports: **the manuscript does use marginals.** The belief
+$b_i \propto \prod_z \pi_{z,i}$ is a product of marginals, and Sec. IV-C
+calls $\pi_{z,i}$ exactly that. The difference the panel measures is not
+marginals versus no marginals; it is whether those marginals are re-taken
+from a list that has been conditioned on each commitment, or read once at the
+start and left alone. The joint list is what makes re-taking them possible.
+
+The mean gap is **+1.1 points** of utility, and 14 of 16 instances improve. That is worth reading against the
 total decomposition loss: the distributed result sits about 1 point below the
 centralized optimum, so the joint list is worth roughly as much as the entire
 remaining gap. This is the measured version of the manuscript's statement that

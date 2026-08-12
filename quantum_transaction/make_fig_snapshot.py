@@ -52,6 +52,12 @@ SEED = 7           # chosen for legibility; see pick_seed and preview_seeds.py
 BETA = 1.5
 K_ACCEPT = 200
 SHOT_BUDGET = 10_000
+FS_TITLE = 8       # one type scale for every panel, so nothing drifts
+FS_LABEL = 7.5
+FS_TICK = 6.5
+FS_LEGEND = 6.2
+COL_RATIO = "#1f6fb4"
+
 N_ZONE_PANELS = 4
 N_BND_PANELS = 2
 ABLATION_CACHE = "ablation_data.npz"
@@ -229,12 +235,12 @@ def panel_zone_law(ax, r, zcol, first):
             fontsize=5.8, color="#c1440e", ha="center", va="center")
     ax.set_xlim(-0.8, len(ref) + pad)
     ax.set_title(f"zone Z{zone.idx}: $N_z$={zone.n_ue}, "
-                 f"$|\mathcal{{F}}_z|$={len(ref)}", fontsize=8)
-    ax.set_xlabel("assignment, ranked by $J_z$", fontsize=7)
+                 f"$|\mathcal{{F}}_z|$={len(ref)}", fontsize=FS_TITLE)
+    ax.set_xlabel("assignment, ranked by $J_z$", fontsize=FS_LABEL)
     if first:
-        ax.set_ylabel("accepted probability", fontsize=8)
-    ax.legend(fontsize=6.2, framealpha=0.9, loc="upper right")
-    ax.tick_params(labelsize=6.5)
+        ax.set_ylabel("accepted probability", fontsize=FS_LABEL)
+    ax.legend(fontsize=FS_LEGEND, framealpha=0.9, loc="upper right")
+    ax.tick_params(labelsize=FS_TICK)
 
 
 def strongest_pair(rep):
@@ -296,7 +302,7 @@ def panel_boundary(ax, item, inst, reports, zcol, first):
     ax.bar(xs - 0.19, jv, width=0.36, color=_tint(zcol.get(zone.idx, "#888"), 0.95),
            label="joint report")
     ax.bar(xs[~bad] + 0.19, pv[~bad], width=0.36, facecolor="none",
-           edgecolor="#333333", hatch="////", lw=0.7, label="marginals only")
+           edgecolor="#333333", hatch="////", lw=0.7, label="product of marginals")
     ax.bar(xs[bad] + 0.19, pv[bad], width=0.36, facecolor="none",
            edgecolor="#c1440e", hatch="////", lw=1.1)
 
@@ -305,18 +311,18 @@ def panel_boundary(ax, item, inst, reports, zcol, first):
     for i in np.where(bad)[0]:
         ax.annotate("impossible,\nyet backed", (i + 0.19, pv[i]),
                     textcoords="offset points", xytext=(0, 4), ha="center",
-                    va="bottom", fontsize=6, color="#c1440e", linespacing=0.95)
+                    va="bottom", fontsize=FS_LEGEND, color="#c1440e",
+                    linespacing=0.95)
 
-    ax.set_title(f"zone Z{zone.idx}, boundary UEs {ua} & {ub}", fontsize=8)
+    ax.set_title(f"zone Z{zone.idx}, boundary UEs {ua} & {ub}", fontsize=FS_TITLE)
     ax.set_xticks(xs)
     ax.set_xticklabels([f"RB{int(zone.cand[ka][x])}\nRB{int(zone.cand[kb][y])}"
-                        for x, y in combos], fontsize=5.8)
-    ax.set_xlabel("joint choice of the two UEs", fontsize=7)
+                        for x, y in combos], fontsize=FS_TICK - 0.7)
+    ax.set_xlabel("joint choice of the two UEs", fontsize=FS_LABEL)
     if first:
-        ax.set_ylabel("probability", fontsize=8)
-    ax.legend(fontsize=6.4, frameon=False, ncol=2, loc="upper center",
-              handlelength=1.3, handletextpad=0.5, columnspacing=1.2)
-    ax.tick_params(labelsize=6.5)
+        ax.set_ylabel("probability", fontsize=FS_LABEL)
+    ax.legend(fontsize=FS_LEGEND, framealpha=0.9, loc="upper right")
+    ax.tick_params(labelsize=FS_TICK)
 
 
 def ablation_data():
@@ -352,34 +358,37 @@ def ablation_data():
 
 
 def panel_ablation(ax, data, first=False):
-    """(c3) what dropping the joint list costs.
+    """(c3) what dropping the re-conditioning costs.
 
-    One line per instance, from the utility a marginal-only exchange reaches
-    to the utility the retained joint list reaches.  Nearly every line rises,
-    which is the consequence the two panels to the left only imply.
+    One point per instance: the utility reached when each zone's marginals
+    are taken once and never revisited, against the utility reached when the
+    retained joint list is re-conditioned after every commitment.  Points
+    above the diagonal are instances where keeping the joint list helped.
     """
-    x = [0, 1]
-    for lo, hi in data:
-        ax.plot(x, [lo, hi], "-", color="#9bb8d4", lw=0.9, zorder=1)
-        ax.plot(x, [lo, hi], ".", color="#9bb8d4", ms=3, zorder=1)
-    m = data.mean(axis=0)
-    ax.set_ylim(data.min() - 0.3, data.max() + 0.9)   # headroom for the label
-    ax.plot(x, m, "o-", color="#1f6fb4", lw=2.4, ms=7, zorder=3)
-    ax.text(0.5, 0.95, f"+{m[1] - m[0]:.1f} pp", transform=ax.transAxes,
-            ha="center", va="top", fontsize=9, color="#1f6fb4",
-            fontweight="bold")
-    for xi, v, va in ((0, m[0], "top"), (1, m[1], "bottom")):
-        ax.annotate(f"{v:.1f}%", (xi, v), textcoords="offset points",
-                    xytext=(0, -11 if va == "top" else 11), ha="center",
-                    fontsize=7.5, color="#1f6fb4")
-    ax.set_xticks(x)
-    ax.set_xticklabels(["marginals\nonly", "joint\nreport"], fontsize=7.5)
-    ax.set_xlim(-0.45, 1.45)
-    ax.set_title(f"cost of dropping the joint list\n{len(data)} instances, "
-                 f"one line each", fontsize=8)
-    ax.set_ylabel("utility vs. centralized optimum [%]", fontsize=7.5)
-    ax.grid(alpha=0.3, lw=0.5, axis="y")
-    ax.tick_params(labelsize=6.5)
+    lo_v, hi_v = data[:, 0], data[:, 1]
+    lo = min(data.min(), 96.0) - 0.4
+    hi = max(data.max(), 100.0) + 0.4
+
+    ax.plot([lo, hi], [lo, hi], "-", color="#999999", lw=1.0, zorder=1)
+    ax.annotate("equal", (hi, hi), textcoords="offset points", xytext=(-4, -4),
+                ha="right", va="top", fontsize=FS_LEGEND, color="#777777")
+    ax.plot(lo_v, hi_v, "o", ms=5.5, color=COL_RATIO, mec="white", mew=0.7,
+            zorder=3)
+
+    won = int((hi_v > lo_v).sum())
+    gap = float((hi_v - lo_v).mean())
+    # every point sits above the line, so the corner below it stays free
+    ax.text(0.96, 0.05, f"+{gap:.1f} pp on average\n{won} of {len(data)} above",
+            transform=ax.transAxes, ha="right", va="bottom",
+            fontsize=FS_LEGEND + 0.6, color=COL_RATIO, linespacing=1.35)
+
+    ax.set_xlim(lo, hi)
+    ax.set_ylim(lo, hi)
+    ax.set_title("cost of dropping the joint list", fontsize=FS_TITLE)
+    ax.set_xlabel("one-pass marginals  [%]", fontsize=FS_LABEL)
+    ax.set_ylabel("re-conditioned joint list  [%]", fontsize=FS_LABEL)
+    ax.grid(alpha=0.3, lw=0.5)
+    ax.tick_params(labelsize=FS_TICK)
 
 
 def panel_order(ax, res):
@@ -392,14 +401,14 @@ def panel_order(ax, res):
     conf = [t["conf"] for t in res["trace"]]
     ax.plot(np.arange(1, len(conf) + 1), conf, ".", ms=4, color="#1f6fb4")
     ax.set_ylim(0.4, 1.02)
-    ax.set_xlabel("boundary UE, in decimation order", fontsize=7)
-    ax.set_ylabel(r"confidence $\max_v b_i(v)$", fontsize=7.5)
+    ax.set_xlabel("boundary UE, in decimation order", fontsize=FS_LABEL)
+    ax.set_ylabel(r"confidence $\max_v b_i(v)$", fontsize=FS_LABEL)
     n_exc = res["exceptions"]
     ax.set_title(f"each boundary UE fixed once, least\n"
                  f"ambiguous first  ·  {n_exc} re-sample"
-                 f"{'' if n_exc == 1 else 's'}", fontsize=7.5)
+                 f"{'' if n_exc == 1 else 's'}", fontsize=FS_TITLE)
     ax.grid(alpha=0.3, lw=0.5)
-    ax.tick_params(labelsize=6.5)
+    ax.tick_params(labelsize=FS_TICK)
 
 
 def main():
