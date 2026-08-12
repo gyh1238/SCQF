@@ -8,7 +8,7 @@ partitioned region, and the average behaviour as the region grows.
 
 | file | what it shows |
 |---|---|
-| `fig/fig_snapshot.{pdf,png}` | one region: the partition the budget produced, the accepted law of four zones against the exact Gibbs reference, boundary coordination on the three most contested UEs, and the decimation order |
+| `fig/fig_snapshot.{pdf,png}` | one region: the partition the budget produced (zones as territories, each boundary UE drawn joined to the APs that offer it a candidate), the accepted law of four zones against the exact Gibbs reference, boundary coordination on the three most contested UEs, and the decimation order |
 | `fig/fig_scaling.{pdf,png}` | growing the region: per-zone circuit cost stays bounded while the centralized circuit grows, at unchanged utility ratio |
 
 ## Reproducing

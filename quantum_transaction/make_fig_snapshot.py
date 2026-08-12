@@ -31,7 +31,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.patches import Patch, Circle
+from matplotlib.patches import Patch
 
 from haiq_instance import make_instance, utility_scale
 from haiq_partition import partition_aps
@@ -64,28 +64,55 @@ def pick_median_seed(seeds=range(8)):
 
 
 def panel_map(ax, inst, part, active, zcol):
-    """(a) the partition, annotated with the resources it produced."""
+    """(a) the partition, annotated with the resources it produced.
+
+    Zones are drawn as territories -- each point of the plane is shaded by
+    the zone owning its nearest AP -- so a zone reads as one contiguous
+    region with real borders rather than as a cluster of identical discs.
+    What actually couples two zones is a UE whose candidate RBs are owned on
+    both sides of a border, so every boundary UE is drawn joined to the APs
+    that offer it a candidate; those links are the ones that cross a border.
+    """
+    lo = inst.ue_xy.min(axis=0) - 0.15
+    hi = inst.ue_xy.max(axis=0) + 0.15
+    gx, gy = np.meshgrid(np.linspace(lo[0], hi[0], 420),
+                         np.linspace(lo[1], hi[1], 420))
+    d2 = ((gx[..., None] - inst.ap_xy[:, 0]) ** 2
+          + (gy[..., None] - inst.ap_xy[:, 1]) ** 2)
+    terr = part.zone_of[np.argmin(d2, axis=2)]           # zone owning each point
+
+    for z in sorted({r["zone"].idx for r in active}):
+        m = (terr == z).astype(float)
+        ax.contourf(gx, gy, m, levels=[0.5, 1.5], colors=[zcol[z]], alpha=0.30,
+                    zorder=0)
+        ax.contour(gx, gy, m, levels=[0.5], colors="white", linewidths=1.0,
+                   zorder=1)
+
+    # boundary UEs are joined to the APs that offer them a candidate RB
+    bset = set(part.boundary.tolist())
+    for i in bset:
+        for r in inst.cand[i]:
+            a = inst.ap_xy[inst.rb_owner[r]]
+            ax.plot([inst.ue_xy[i, 0], a[0]], [inst.ue_xy[i, 1], a[1]],
+                    color="#c1440e", lw=0.55, alpha=0.55, zorder=2)
+
     for z, aps in enumerate(part.zones):
         if not aps:
             continue
-        col = zcol.get(z, "#dddddd")
-        for a in aps:                       # soft blobs merge adjacent APs
-            ax.add_patch(Circle(inst.ap_xy[a], 0.46, facecolor=col, alpha=0.22,
-                                lw=0, zorder=1))
         xy = inst.ap_xy[aps]
-        ax.scatter(xy[:, 0], xy[:, 1], s=120, marker="s", color=col,
-                   edgecolor="black", linewidth=0.6, zorder=3)
+        ax.scatter(xy[:, 0], xy[:, 1], s=120, marker="s",
+                   color=zcol.get(z, "#dddddd"), edgecolor="black",
+                   linewidth=0.7, zorder=4)
 
-    bset = set(part.boundary.tolist())
     for i in range(inst.n_ue):
         x, y = inst.ue_xy[i]
         if i in bset:
-            ax.scatter(x, y, s=26, marker="o", facecolor="white",
-                       edgecolor="#c1440e", linewidth=1.3, zorder=4)
+            ax.scatter(x, y, s=28, marker="o", facecolor="white",
+                       edgecolor="#c1440e", linewidth=1.3, zorder=5)
         else:
             ax.scatter(x, y, s=11, marker="o",
                        color=zcol.get(part.ue_zones[i][0], "#999999"),
-                       alpha=0.8, zorder=2)
+                       alpha=0.85, zorder=3)
 
     for r in active:
         zone = r["zone"]
@@ -110,10 +137,12 @@ def panel_map(ax, inst, part, active, zcol):
         plt.Line2D([], [], marker="o", ls="", mfc="white", mec="#c1440e",
                    mew=1.3, ms=6, label="boundary UE"),
         plt.Line2D([], [], marker="o", ls="", color="#999999", ms=4,
-                   label="interior UE")],
-        loc="upper left", bbox_to_anchor=(0.0, -0.015), fontsize=7.5, ncol=3,
+                   label="interior UE"),
+        plt.Line2D([], [], color="#c1440e", lw=0.9, alpha=0.7,
+                   label="UE-to-candidate-AP link")],
+        loc="upper left", bbox_to_anchor=(0.0, -0.015), fontsize=7.5, ncol=2,
         frameon=False, handletextpad=0.4, columnspacing=1.1,
-        title="zone labels: UEs, state qubits, two-qubit gates",
+        title="shading: zone territory (nearest AP)",
         title_fontsize=7.5, alignment="left")
 
 
@@ -165,11 +194,8 @@ def panel_boundary(ax, t, inst, reports, holders, zcol, first):
                label=f"$\\pi_{{Z{rep['zone'].idx}}}$")
     ax.bar(xs + len(hs) * width - 0.4 + width / 2, t["belief"],
            width=width * 0.9, color="#222222", alpha=0.9, label="$b_i$")
-    ax.axvline(t["value"], color="#c1440e", ls="--", lw=1.3, zorder=0)
-    ax.annotate("committed", (t["value"], 0.985), xycoords=("data", "axes fraction"),
-                fontsize=6.2, color="#c1440e", ha="center", va="top",
-                bbox=dict(boxstyle="round,pad=0.14", fc="white", ec="none",
-                          alpha=0.85))
+    ax.axvspan(t["value"] - 0.47, t["value"] + 0.47, color="#c1440e", alpha=0.13,
+               lw=0, zorder=0)
     owners = " + ".join(f"Z{reports[ri]['zone'].idx}" for ri, _ in hs)
     ax.set_title(f"boundary UE {i}:  {owners}\nconfidence {t['conf']:.2f}",
                  fontsize=7.5)
@@ -178,7 +204,10 @@ def panel_boundary(ax, t, inst, reports, holders, zcol, first):
     ax.set_xlabel("candidate", fontsize=7)
     if first:
         ax.set_ylabel("marginal / belief", fontsize=8)
-    ax.legend(fontsize=5.8, framealpha=0.9, ncol=1, loc="upper left")
+    handles, labels = ax.get_legend_handles_labels()
+    handles.append(Patch(facecolor="#c1440e", alpha=0.28, label="committed"))
+    ax.legend(handles=handles, fontsize=5.8, framealpha=0.9, ncol=1,
+              loc="upper left")
     ax.tick_params(labelsize=6.5)
 
 
@@ -231,7 +260,8 @@ def main():
              f"g={G}, seed={seed} (median of {len(all_ratios)} seeds by utility "
              f"ratio); beta={BETA}, K_z={K_ACCEPT}. Utility {res['utility']:.1f} "
              f"of the centralized strict optimum {opt:.1f} = {ratio:.1f}%; the "
-             f"assignment is strictly feasible ({res['feasible']}).",
+             f"assignment is strictly feasible ({res['feasible']}). "
+             f"Zone labels in (a): UEs, state qubits, two-qubit gates.",
              fontsize=7, color="#555555")
     fig.text(0.008, 0.008,
              "Zone laws are exact: the accepted branch of the circuit matches "
