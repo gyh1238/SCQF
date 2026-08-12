@@ -31,6 +31,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.colors import to_rgb
 
 from haiq_instance import make_instance, utility_scale
 from haiq_partition import partition_aps
@@ -102,12 +103,25 @@ def _save(fig, stem, formats=("pdf", "svg", "png"), **kw):
         fig.savefig(f"{stem}.{ext}", transparent=True, **kw)
 
 
+def _tint(color, frac):
+    """`color` blended `frac` of the way from white, returned opaque.
+
+    Semi-transparent fills survive PDF and SVG but not every PNG viewer: a
+    13%-alpha region is stored as full-saturation RGB with alpha 33, so a
+    viewer that flattens or ignores the alpha channel shows the saturated
+    colour instead of the tint.  Baking the blend keeps the figure background
+    transparent while making the fills render identically everywhere.
+    """
+    r, g, b = to_rgb(color)
+    return (1 - frac + frac * r, 1 - frac + frac * g, 1 - frac + frac * b)
+
+
 def panel_cost(ax, x, z2q, z2lo, z2hi, c2q, title=False, standalone=False):
     """(a) two-qubit gate count of one oracle pass against the growth axis."""
     ax.set_yscale("log")
     ax.axhline(CEIL_KINGSTON, color=COL["ceil"], ls=":", lw=1.2)
     ax.axhline(CEIL_BOSTON, color=COL["ceil"], ls="-.", lw=1.2)
-    ax.axhline(BUDGET_DEFAULT, color=COL["zone"], ls="--", lw=1.0, alpha=0.6)
+    ax.axhline(BUDGET_DEFAULT, color=_tint(COL["zone"], 0.6), ls="--", lw=1.0)
     ax.text(x[0], CEIL_KINGSTON * 0.80, "Heron2 half-signal (measured)",
             ha="left", va="top", fontsize=7, color="#5a5a5a")
     ax.text(x[0], CEIL_BOSTON * 0.80, "Heron3 half-signal (measured)",
@@ -117,7 +131,7 @@ def panel_cost(ax, x, z2q, z2lo, z2hi, c2q, title=False, standalone=False):
 
     ax.plot(x, c2q, "s--", color=COL["cen"], ms=5, lw=1.8,
             label="centralized: one circuit for the whole region")
-    ax.fill_between(x, z2lo, z2hi, color=COL["zone"], alpha=0.20, lw=0)
+    ax.fill_between(x, z2lo, z2hi, color=_tint(COL["zone"], 0.20), lw=0)
     ax.plot(x, z2q, "o-", color=COL["zone"], ms=5, lw=1.8,
             label="distributed: largest zone circuit")
     ax.set_ylabel("two-qubit gates\n(one oracle pass)", fontsize=9.5)
@@ -133,7 +147,7 @@ def panel_cost(ax, x, z2q, z2lo, z2hi, c2q, title=False, standalone=False):
 def panel_quality(ax, x, ratio, rlo, rhi, n_ues, standalone=False):
     """(b) distributed utility as a fraction of the centralized strict optimum."""
     ax.axhline(100, color="#999999", lw=0.9, ls="-")
-    ax.fill_between(x, rlo, rhi, color=COL["ratio"], alpha=0.22, lw=0)
+    ax.fill_between(x, rlo, rhi, color=_tint(COL["ratio"], 0.22), lw=0)
     ax.plot(x, ratio, "^-", color=COL["ratio"], ms=6, lw=2.0,
             label="distributed utility / centralized strict optimum")
     ax.set_ylim(95, 101)

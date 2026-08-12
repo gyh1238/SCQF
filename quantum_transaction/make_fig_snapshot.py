@@ -36,6 +36,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.colors import to_rgb
 from matplotlib.patches import Patch
 
 from haiq_instance import make_instance, utility_scale
@@ -53,6 +54,19 @@ K_ACCEPT = 200
 SHOT_BUDGET = 10_000
 N_ZONE_PANELS = 4
 N_BND_PANELS = 3
+
+
+def _tint(color, frac):
+    """`color` blended `frac` of the way from white, returned opaque.
+
+    Semi-transparent fills survive PDF and SVG but not every PNG viewer: a
+    13%-alpha region is stored as full-saturation RGB with alpha 33, so a
+    viewer that flattens or ignores the alpha channel shows the saturated
+    colour instead of the tint.  Baking the blend keeps the figure background
+    transparent while making the fills render identically everywhere.
+    """
+    r, g, b = to_rgb(color)
+    return (1 - frac + frac * r, 1 - frac + frac * g, 1 - frac + frac * b)
 
 
 def _count(n):
@@ -120,7 +134,7 @@ def panel_map(ax, inst, part, active, zcol):
             continue
         m = (terr == z).astype(float)
         ax.contourf(gx, gy, m, levels=[0.5, 1.5],
-                    colors=[zcol.get(z, "#cccccc")], alpha=0.30, zorder=0)
+                    colors=[_tint(zcol.get(z, "#cccccc"), 0.30)], zorder=0)
         ax.contour(gx, gy, m, levels=[0.5], colors="white", linewidths=1.0,
                    zorder=1)
 
@@ -130,7 +144,7 @@ def panel_map(ax, inst, part, active, zcol):
         for r in inst.cand[i]:
             a = inst.ap_xy[inst.rb_owner[r]]
             ax.plot([inst.ue_xy[i, 0], a[0]], [inst.ue_xy[i, 1], a[1]],
-                    color="#c1440e", lw=0.55, alpha=0.55, zorder=2)
+                    color=_tint("#c1440e", 0.55), lw=0.55, zorder=2)
 
     for z, aps in enumerate(part.zones):
         if not aps:
@@ -147,8 +161,8 @@ def panel_map(ax, inst, part, active, zcol):
                        edgecolor="#c1440e", linewidth=1.3, zorder=5)
         else:
             ax.scatter(x, y, s=11, marker="o",
-                       color=zcol.get(part.ue_zones[i][0], "#999999"),
-                       alpha=0.85, zorder=3)
+                       color=_tint(zcol.get(part.ue_zones[i][0], "#999999"), 0.85),
+                       zorder=3)
 
     for r in active:
         zone = r["zone"]
@@ -157,8 +171,7 @@ def panel_map(ax, inst, part, active, zcol):
         ax.annotate(f"Z{zone.idx}\n{st['n_ue']}u {st['q_state']}q\n{st['n2q']}",
                     (c[0], c[1] + 0.30), fontsize=5.2, ha="center", va="center",
                     zorder=6, linespacing=0.95,
-                    bbox=dict(boxstyle="round,pad=0.12", fc="white", ec="none",
-                              alpha=0.80))
+                    bbox=dict(boxstyle="round,pad=0.12", fc="white", ec="none"))
 
     ax.set_title(f"(a) partition under a {BUDGET_DEFAULT} two-qubit budget\n"
                  f"{inst.n_ap} APs, {inst.n_ue} UEs "
@@ -174,7 +187,7 @@ def panel_map(ax, inst, part, active, zcol):
                    mew=1.3, ms=6, label="boundary UE"),
         plt.Line2D([], [], marker="o", ls="", color="#999999", ms=4,
                    label="interior UE"),
-        plt.Line2D([], [], color="#c1440e", lw=0.9, alpha=0.7,
+        plt.Line2D([], [], color=_tint("#c1440e", 0.55), lw=0.9,
                    label="UE-to-candidate-AP link")],
         loc="upper left", bbox_to_anchor=(0.0, -0.015), fontsize=7.5, ncol=2,
         frameon=False, handletextpad=0.4, columnspacing=1.1,
@@ -195,13 +208,13 @@ def panel_zone_law(ax, r, zcol, first):
         meas /= meas.sum()
 
     xs = np.arange(len(ref))
-    ax.bar(xs, meas, width=0.9, color=zcol.get(zone.idx, "#888"), alpha=0.85,
+    ax.bar(xs, meas, width=0.9, color=_tint(zcol.get(zone.idx, "#888"), 0.85),
            label="measured", zorder=2)
     ax.step(np.concatenate([[-0.5], xs + 0.5]), np.concatenate([[ref[0]], ref]),
             where="pre", color="black", lw=1.0, label=r"$\propto e^{\lambda J_z}$",
             zorder=3)
     pad = max(3, len(ref) * 0.09)
-    ax.axvspan(len(ref) - 0.5, len(ref) + pad, color="#c1440e", alpha=0.09, lw=0)
+    ax.axvspan(len(ref) - 0.5, len(ref) + pad, color=_tint("#c1440e", 0.09), lw=0)
     ax.text(len(ref) + pad * 0.55, ax.get_ylim()[1] * 0.5, "infeasible:\nzero mass",
             fontsize=5.8, color="#c1440e", ha="center", va="center")
     ax.set_xlim(-0.8, len(ref) + pad)
@@ -270,8 +283,8 @@ def panel_boundary(ax, item, inst, reports, committed, zcol, first):
     infeasible = np.array([
         not ((rows[:, ka] == x) & (rows[:, kb] == y)).any() for x, y in combos])
 
-    ax.bar(xs - 0.19, jv, width=0.36, color=zcol.get(zone.idx, "#888"),
-           alpha=0.95, label="retained joint")
+    ax.bar(xs - 0.19, jv, width=0.36, color=_tint(zcol.get(zone.idx, "#888"), 0.95),
+           label="retained joint")
     ax.bar(xs[~infeasible] + 0.19, pv[~infeasible], width=0.36, facecolor="none",
            edgecolor="#333333", hatch="////", lw=0.7,
            label="product of marginals")
@@ -283,7 +296,7 @@ def panel_boundary(ax, item, inst, reports, committed, zcol, first):
     # where decimation actually landed
     if ua in committed and ub in committed:
         hit = combos.index((committed[ua], committed[ub]))
-        ax.axvspan(hit - 0.47, hit + 0.47, color="#c1440e", alpha=0.13, lw=0,
+        ax.axvspan(hit - 0.47, hit + 0.47, color=_tint("#c1440e", 0.13), lw=0,
                    zorder=0)
 
     ax.set_title(f"zone Z{zone.idx}, boundary UEs {ua} & {ub}\n"
@@ -295,7 +308,7 @@ def panel_boundary(ax, item, inst, reports, committed, zcol, first):
     if first:
         ax.set_ylabel("probability", fontsize=8)
     handles, _ = ax.get_legend_handles_labels()
-    handles.append(Patch(facecolor="#c1440e", alpha=0.28, label="committed"))
+    handles.append(Patch(facecolor=_tint("#c1440e", 0.13), label="committed"))
     ax.legend(handles=handles, fontsize=5.8, framealpha=0.9, loc="upper right")
     ax.tick_params(labelsize=6.5)
 
@@ -333,7 +346,7 @@ def main():
     zcol = {z: cmap(i % 20) for i, z in
             enumerate(sorted(r["zone"].idx for r in active))}
 
-    fig = plt.figure(figsize=(13.6, 6.9))
+    fig = plt.figure(figsize=(13.6, 6.4))
     gs = fig.add_gridspec(2, 5, width_ratios=[1.95, 1, 1, 1, 1],
                           height_ratios=[1, 1])
 
@@ -352,27 +365,11 @@ def main():
                        res["committed"], zcol, j == 0)
     panel_order(fig.add_subplot(gs[1, 4]), res)
 
-    fig.suptitle("A region partitioned to the hardware budget, solved by "
-                 "zone-local sampling and classical boundary coordination",
-                 fontsize=11.5, y=0.982)
-    fig.text(0.008, 0.028,
-             f"g={G}, seed={seed}, chosen for legibility; its utility ratio sits "
-             f"at the mean of {len(all_ratios)} candidate seeds "
-             f"({np.mean(all_ratios):.1f}%, spread {min(all_ratios):.1f}-"
-             f"{max(all_ratios):.1f}%). beta={BETA}, K_z={K_ACCEPT}. "
-             f"Utility {res['utility']:.1f} "
-             f"of the centralized strict optimum {opt:.1f} = {ratio:.1f}%; the "
-             f"assignment is strictly feasible ({res['feasible']}). "
-             f"Zone labels in (a): UEs, state qubits, two-qubit gates.",
-             fontsize=7, color="#555555")
-    fig.text(0.008, 0.008,
-             "Zone laws are exact: the accepted branch of the circuit matches "
-             "exp(lambda J_z) on F_z to statevector precision (max TVD 2.7e-15 "
-             "over the zones checked in haiq_certify.py), so the sampler used "
-             "here is the same law the circuit produces.",
-             fontsize=7, color="#555555")
-    fig.subplots_adjust(left=0.028, right=0.988, top=0.90, bottom=0.115,
-                        wspace=0.34, hspace=0.52)
+    # No figure title and no caption block: the caption belongs to the
+    # document that places the figure, and the numbers behind this instance
+    # are printed to stdout and recorded in fig/README.md.
+    fig.subplots_adjust(left=0.028, right=0.988, top=0.945, bottom=0.075,
+                        wspace=0.34, hspace=0.42)
     os.makedirs("fig", exist_ok=True)
     _save(fig, "fig/fig_snapshot", formats=("pdf", "png"), dpi=200)
     plt.close(fig)
