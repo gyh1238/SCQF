@@ -39,11 +39,19 @@ from haiq_protocol import run_protocol
 from haiq_reference import solve_centralized
 from haiq_cost import BUDGET_DEFAULT
 
+PANEL_DIR = "fig/panels"
+
 G = 5
 BETA = 1.5
 K_ACCEPT = 2000
 N_ZONE_PANELS = 4
 N_BND_PANELS = 3
+
+
+def _save(fig, stem, formats=("pdf", "svg"), **kw):
+    """Every output is written on a transparent background."""
+    for ext in formats:
+        fig.savefig(f"{stem}.{ext}", transparent=True, **kw)
 
 
 def pick_median_seed(seeds=range(8)):
@@ -272,9 +280,31 @@ def main():
     fig.subplots_adjust(left=0.028, right=0.988, top=0.90, bottom=0.115,
                         wspace=0.34, hspace=0.52)
     os.makedirs("fig", exist_ok=True)
-    for ext in ("pdf", "png"):
-        fig.savefig(f"fig/fig_snapshot.{ext}", dpi=200)
+    _save(fig, "fig/fig_snapshot", formats=("pdf", "png"), dpi=200)
+    plt.close(fig)
     print("wrote fig/fig_snapshot.pdf and .png")
+
+    # ---- the same panels again, standalone and separately editable -------
+    os.makedirs(PANEL_DIR, exist_ok=True)
+    specs = [("snapshot_a_partition", (6.4, 6.4),
+              lambda ax: panel_map(ax, inst, part, active, zcol))]
+    for j, r in enumerate([active[i] for i in order[:N_ZONE_PANELS]]):
+        specs.append((f"snapshot_b{j+1}_zone_law_Z{r['zone'].idx}", (4.2, 3.2),
+                      lambda ax, r=r: panel_zone_law(ax, r, zcol, True)))
+    for j, t in enumerate(contested):
+        specs.append((f"snapshot_c{j+1}_boundary_UE{t['ue']}", (3.6, 3.2),
+                      lambda ax, t=t: panel_boundary(ax, t, inst, reports,
+                                                     holders, zcol, True)))
+    specs.append(("snapshot_d_decimation_order", (4.2, 3.2),
+                  lambda ax: panel_order(ax, res)))
+
+    for stem, size, draw in specs:
+        f, a = plt.subplots(figsize=size)
+        draw(a)
+        f.tight_layout()
+        _save(f, f"{PANEL_DIR}/{stem}", bbox_inches="tight")
+        plt.close(f)
+    print(f"wrote {len(specs)} standalone panels to {PANEL_DIR}/ (pdf + svg)")
 
 
 if __name__ == "__main__":
