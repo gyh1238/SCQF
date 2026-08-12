@@ -62,7 +62,8 @@ def _weights(util, d_lambda, n_target):
 
 
 def run_protocol(inst, part, beta, ubar, k_accept=200, k_min=25,
-                 shot_budget=10_000, rng=None, collect=False, max_attempts=4):
+                 shot_budget=10_000, rng=None, collect=False, max_attempts=4,
+                 use_joint=True):
     """
     Run the local stage and the coordination stage.
 
@@ -77,7 +78,7 @@ def run_protocol(inst, part, beta, ubar, k_accept=200, k_min=25,
     last = None
     for attempt in range(max_attempts):
         res = _run_once(inst, part, beta, ubar, k_accept, k_min,
-                        shot_budget, rng, collect)
+                        shot_budget, rng, collect, use_joint)
         res["attempts"] = attempt + 1
         last = res
         if res["feasible"]:
@@ -86,7 +87,7 @@ def run_protocol(inst, part, beta, ubar, k_accept=200, k_min=25,
 
 
 def _run_once(inst, part, beta, ubar, k_accept, k_min, shot_budget, rng,
-              collect):
+              collect, use_joint=True):
     """One local stage followed by one coordination pass."""
     lam = beta / ubar
 
@@ -227,7 +228,12 @@ def _run_once(inst, part, beta, ubar, k_accept, k_min, shot_budget, rng,
 
         if level == len(seq):
             # open the next variable: the least ambiguous uncommitted UE
-            kept = [conditioned(ri) for ri in range(len(reports))]
+            # use_joint=False is the ablation: the zone is treated as though it
+            # had reported one marginal per boundary UE, so nothing is
+            # conditioned and the correlations never re-enter
+            kept = [conditioned(ri) if use_joint else (base[ri], base_w[ri],
+                                                       base_u[ri])
+                    for ri in range(len(reports))]
             best_i, best_conf, best_b = None, -1.0, None
             for i in bnd:
                 if i in committed:

@@ -26,7 +26,7 @@ Panels:
 | `panels/snapshot_b4_zone_law_Z4.*` | (b4) zone Z4 accepted law |
 | `panels/snapshot_c1_joint_Z10_UE38_40.*` | (c1) joint vs. marginals, zone Z10 |
 | `panels/snapshot_c2_joint_Z9_UE25_38.*` | (c2) joint vs. marginals, zone Z9 |
-| `panels/snapshot_c3_joint_Z0_UE1_25.*` | (c3) joint vs. marginals, zone Z0 |
+| `panels/snapshot_c3_ablation_joint_vs_marginals.*` | (c3) what dropping the joint list costs |
 | `panels/snapshot_d_decimation_order.*` | (d) order the boundary UEs were fixed |
 | `panels/scaling_a_circuit_cost.*` | (a) two-qubit gate count vs. zones |
 | `panels/scaling_b_utility_ratio.*` | (b) utility ratio vs. zones |
@@ -208,35 +208,41 @@ circuit's law. Departures are finite-sample noise at $K_z=200$, larger where
 $\widetilde K_z$ is smaller; `haiq_certify.py` checks the same statement exactly against a
 Qiskit statevector (max TVD $2.7\times10^{-15}$, zero spurious states).
 
-### (c1)–(c3) what the joint report carries that marginals do not
+### (c1)–(c3) why the boundary report is a joint list
 
-The three zones whose boundary UEs are most strongly coupled, each shown for
-its most dependent pair.
+The row answers one question — why a zone sends a list of retained *joint*
+draws instead of one marginal per boundary UE — in two steps.
+
+**(c1), (c2): what marginals lose.** The two zones whose boundary UEs are most
+strongly coupled, each for its most dependent pair.
 
 - **x**: the four joint choices the two UEs can make, labelled by RB.
-- **y**: probability.
-- **solid bars**: the zone's retained joint report, restricted to that pair.
-- **hatched bars**: the outer product of the zone's own marginals for the same
-  pair — what a marginal or scalar-preference exchange would reconstruct.
-- **red hatched bars**: the same product mass, on combinations that are absent
-  from $\mathcal{F}_z$ entirely. Those are not rare, they are impossible: the
-  two UEs would break an owned RB or AP limit.
-- **shaded column**: where decimation actually committed.
-- **title**: the zone, the pair, and the total-variation distance between the
-  joint and the product.
+- **solid bars**: the zone's joint report, restricted to that pair.
+- **hatched bars**: the outer product of that zone's own marginals — what a
+  marginal or preference exchange would reconstruct.
+- **red bar, annotated in place**: the product still backs a combination that
+  is absent from $\mathcal{F}_z$ altogether. Not rare — impossible: the two
+  UEs would break an owned RB or AP limit. It carries about a fifth of the
+  product's belief and exactly none of the joint's.
 
-This is the panel that justifies sending a distribution-valued report rather
-than a preference. Sec. IV-C states that the product of single-UE marginals is
-only a one-pass consensus estimate and that the correlations among several
-boundary UEs live in the joint list; the panels measure that gap at
-TV = 0.37–0.40, and show the sharper version of it: in every panel there is a
-configuration the joint gives exactly zero probability while the product gives
-it 19–20 %. A protocol that exchanged marginals would spend a sixth of its
-belief on assignments that cannot exist.
+**(c3): what losing them costs.** One line per instance, from the utility a
+marginal-only exchange reaches to the utility the retained joint list reaches;
+the thick line is the mean. Everything is held fixed between the two runs —
+sampler, feasibility guard, commitment order — and only the report format
+changes, so the gap is attributable to the format alone.
 
-The same comparison over a zone's full boundary block is larger still, and it
-is exactly 0 in the zones whose owned limits do not couple their boundary UEs
-— the correlation appears precisely where the constraints bind.
+The mean gap is **+1.1 points** of utility. That is worth reading against the
+total decomposition loss: the distributed result sits about 1 point below the
+centralized optimum, so the joint list is worth roughly as much as the entire
+remaining gap. This is the measured version of the manuscript's statement that
+the correlations "re-enter through the conditioning performed after each
+commitment".
+
+The panels deliberately do not mark where decimation committed. Commitment
+happens one UE at a time, later, after conditioning, and using a product
+across the zones that hold that UE — not within one zone's pairwise joint. It
+therefore need not land on the largest bar, and marking it invited exactly
+that misreading.
 
 ### (d) the order decimation fixed the boundary UEs
 

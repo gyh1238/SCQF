@@ -12,11 +12,11 @@ Panels, each carrying one checkable claim rather than an illustration:
      stays readable at any zone size.  Ranks outside F_z carry exactly zero
      mass, which is strict feasibility made visible;
 
- (c) what the retained joint report carries that a marginal exchange would
-     not: for the most dependent pairs of boundary UEs, the zone's joint
-     against the product of its own marginals.  The paper states that the
-     product of single-UE marginals is only a one-pass consensus estimate and
-     that the correlations live in the joint list; this is that gap, measured;
+ (c) why the boundary report is a joint list rather than one marginal per
+     UE.  The first two panels show what marginals lose: for the most
+     dependent pair of boundary UEs in a zone, the product of marginals backs
+     a combination the joint rules out entirely.  The third shows what that
+     loss costs, by running the whole protocol both ways;
 
  (d) the order decimation fixed the boundary UEs: one point per UE.
 
@@ -53,7 +53,10 @@ BETA = 1.5
 K_ACCEPT = 200
 SHOT_BUDGET = 10_000
 N_ZONE_PANELS = 4
-N_BND_PANELS = 3
+N_BND_PANELS = 2
+ABLATION_CACHE = "ablation_data.npz"
+ABLATION_G = (4, 5, 6, 7)
+ABLATION_SEEDS = range(4)
 
 
 def _tint(color, frac):
@@ -262,15 +265,16 @@ def strongest_pair(rep):
     return best
 
 
-def panel_boundary(ax, item, inst, reports, committed, zcol, first):
+def panel_boundary(ax, item, inst, reports, zcol, first):
     """(c) what a joint report carries that a marginal exchange would not.
 
     The paper's boundary message is a list of retained *joint* draws, and it
-    says explicitly that the product of single-UE marginals is only a
-    one-pass consensus estimate: correlations among several boundary UEs live
-    in the joint list, not in the product.  This panel puts the two side by
-    side for the most dependent pair of boundary UEs in a zone -- the gap is
-    exactly the information a marginal or scalar exchange discards.
+    says the product of single-UE marginals is only a one-pass consensus
+    estimate: the correlations among boundary UEs live in the joint list, not
+    in the product.  The panel puts the two side by side for the most
+    dependent pair of boundary UEs in a zone.  The bar to read first is the
+    red one -- a combination the joint rules out entirely, which the product
+    still backs with a fifth of its belief.
     """
     ri, (tv, ka, kb, joint, prod) = item
     rep = reports[ri]
@@ -284,39 +288,97 @@ def panel_boundary(ax, item, inst, reports, committed, zcol, first):
     pv = np.array([prod[x, y] for x, y in combos])
 
     # a combination absent from F_z is not rare, it is impossible: the two UEs
-    # would break an owned RB or AP limit.  The joint report knows; the product
-    # of marginals does not, and still assigns it mass.
+    # would break an owned RB or AP limit
     rows = rep["rows"]
-    infeasible = np.array([
-        not ((rows[:, ka] == x) & (rows[:, kb] == y)).any() for x, y in combos])
+    bad = np.array([not ((rows[:, ka] == x) & (rows[:, kb] == y)).any()
+                    for x, y in combos])
 
     ax.bar(xs - 0.19, jv, width=0.36, color=_tint(zcol.get(zone.idx, "#888"), 0.95),
-           label="retained joint")
-    ax.bar(xs[~infeasible] + 0.19, pv[~infeasible], width=0.36, facecolor="none",
-           edgecolor="#333333", hatch="////", lw=0.7,
-           label="product of marginals")
-    if infeasible.any():
-        ax.bar(xs[infeasible] + 0.19, pv[infeasible], width=0.36,
-               facecolor="none", edgecolor="#c1440e", hatch="////", lw=1.0,
-               label="product mass on\ninfeasible states")
+           label="joint report")
+    ax.bar(xs[~bad] + 0.19, pv[~bad], width=0.36, facecolor="none",
+           edgecolor="#333333", hatch="////", lw=0.7, label="marginals only")
+    ax.bar(xs[bad] + 0.19, pv[bad], width=0.36, facecolor="none",
+           edgecolor="#c1440e", hatch="////", lw=1.1)
 
-    # where decimation actually landed
-    if ua in committed and ub in committed:
-        hit = combos.index((committed[ua], committed[ub]))
-        ax.axvspan(hit - 0.47, hit + 0.47, color=_tint("#c1440e", 0.13), lw=0,
-                   zorder=0)
+    top = max(jv.max(), pv.max())
+    ax.set_ylim(0, top * 1.42)                     # headroom for the key
+    for i in np.where(bad)[0]:
+        ax.annotate("impossible,\nyet backed", (i + 0.19, pv[i]),
+                    textcoords="offset points", xytext=(0, 4), ha="center",
+                    va="bottom", fontsize=6, color="#c1440e", linespacing=0.95)
 
-    ax.set_title(f"zone Z{zone.idx}, boundary UEs {ua} & {ub}\n"
-                 f"TV(joint, product) = {tv:.2f}", fontsize=7.5)
+    ax.set_title(f"zone Z{zone.idx}, boundary UEs {ua} & {ub}", fontsize=8)
     ax.set_xticks(xs)
     ax.set_xticklabels([f"RB{int(zone.cand[ka][x])}\nRB{int(zone.cand[kb][y])}"
-                        for x, y in combos], fontsize=5.6)
+                        for x, y in combos], fontsize=5.8)
     ax.set_xlabel("joint choice of the two UEs", fontsize=7)
     if first:
         ax.set_ylabel("probability", fontsize=8)
-    handles, _ = ax.get_legend_handles_labels()
-    handles.append(Patch(facecolor=_tint("#c1440e", 0.13), label="committed"))
-    ax.legend(handles=handles, fontsize=5.8, framealpha=0.9, loc="upper right")
+    ax.legend(fontsize=6.4, frameon=False, ncol=2, loc="upper center",
+              handlelength=1.3, handletextpad=0.5, columnspacing=1.2)
+    ax.tick_params(labelsize=6.5)
+
+
+def ablation_data():
+    """Utility with the retained joint list, and with marginals only.
+
+    `use_joint=False` treats each zone as though it had reported one marginal
+    per boundary UE: nothing is conditioned after a commitment, so the
+    correlations never re-enter.  Everything else -- the sampler, the guard,
+    the commitment order -- is identical, so the difference is attributable to
+    the report format alone.
+    """
+    if os.path.exists(ABLATION_CACHE):
+        return np.load(ABLATION_CACHE)["data"]
+    rows = []
+    for g in ABLATION_G:
+        for sd in ABLATION_SEEDS:
+            inst = make_instance(g=g, seed=sd)
+            opt, _, ok = solve_centralized(inst)
+            if not ok:
+                continue
+            part = partition_aps(inst)
+            ub = utility_scale(inst)
+            kw = dict(beta=BETA, ubar=ub, k_accept=K_ACCEPT,
+                      shot_budget=SHOT_BUDGET)
+            a = run_protocol(inst, part, rng=np.random.default_rng(5),
+                             use_joint=True, **kw)
+            b = run_protocol(inst, part, rng=np.random.default_rng(5),
+                             use_joint=False, **kw)
+            rows.append((100 * b["utility"] / opt, 100 * a["utility"] / opt))
+    data = np.array(rows)
+    np.savez(ABLATION_CACHE, data=data)
+    return data
+
+
+def panel_ablation(ax, data, first=False):
+    """(c3) what dropping the joint list costs.
+
+    One line per instance, from the utility a marginal-only exchange reaches
+    to the utility the retained joint list reaches.  Nearly every line rises,
+    which is the consequence the two panels to the left only imply.
+    """
+    x = [0, 1]
+    for lo, hi in data:
+        ax.plot(x, [lo, hi], "-", color="#9bb8d4", lw=0.9, zorder=1)
+        ax.plot(x, [lo, hi], ".", color="#9bb8d4", ms=3, zorder=1)
+    m = data.mean(axis=0)
+    ax.set_ylim(data.min() - 0.3, data.max() + 0.9)   # headroom for the label
+    ax.plot(x, m, "o-", color="#1f6fb4", lw=2.4, ms=7, zorder=3)
+    ax.text(0.5, 0.95, f"+{m[1] - m[0]:.1f} pp", transform=ax.transAxes,
+            ha="center", va="top", fontsize=9, color="#1f6fb4",
+            fontweight="bold")
+    for xi, v, va in ((0, m[0], "top"), (1, m[1], "bottom")):
+        ax.annotate(f"{v:.1f}%", (xi, v), textcoords="offset points",
+                    xytext=(0, -11 if va == "top" else 11), ha="center",
+                    fontsize=7.5, color="#1f6fb4")
+    ax.set_xticks(x)
+    ax.set_xticklabels(["marginals\nonly", "joint\nreport"], fontsize=7.5)
+    ax.set_xlim(-0.45, 1.45)
+    ax.set_title(f"cost of dropping the joint list\n{len(data)} instances, "
+                 f"one line each", fontsize=8)
+    ax.set_ylabel("utility vs. centralized optimum [%]", fontsize=7.5)
+    ax.grid(alpha=0.3, lw=0.5, axis="y")
     ax.tick_params(labelsize=6.5)
 
 
@@ -369,7 +431,9 @@ def main():
     pairs = pairs[:N_BND_PANELS]
     for j, item in enumerate(pairs):
         panel_boundary(fig.add_subplot(gs[1, 1 + j]), item, inst, reports,
-                       res["committed"], zcol, j == 0)
+                       zcol, j == 0)
+    abl = ablation_data()
+    panel_ablation(fig.add_subplot(gs[1, 1 + N_BND_PANELS]), abl)
     panel_order(fig.add_subplot(gs[1, 4]), res)
 
     # No figure title and no caption block: the caption belongs to the
@@ -398,7 +462,9 @@ def main():
         ua, ub = zi.ue[item[1][1]], zi.ue[item[1][2]]
         specs.append((f"snapshot_c{j+1}_joint_Z{zi.idx}_UE{ua}_{ub}", (4.0, 3.2),
                       lambda ax, item=item: panel_boundary(
-                          ax, item, inst, reports, res["committed"], zcol, True)))
+                          ax, item, inst, reports, zcol, True)))
+    specs.append((f"snapshot_c{N_BND_PANELS+1}_ablation_joint_vs_marginals",
+                  (3.4, 3.2), lambda ax: panel_ablation(ax, abl)))
     specs.append(("snapshot_d_decimation_order", (4.2, 3.2),
                   lambda ax: panel_order(ax, res)))
 
