@@ -339,18 +339,14 @@ def panel_boundary(ax, item, inst, reports, zcol, first):
     ax.bar(xs[bad] + 0.19, pv[bad], width=0.36, facecolor="none",
            edgecolor="#c1440e", hatch="////", lw=1.1)
 
-    # Sorting puts the impossible combination last and the key sits in a
-    # corner, so both would land on a bar.  Open a clear band above the tallest
-    # bar: key on the left of it, label on the right, joined to its bar by a
-    # thin leader so the association survives the distance.
     top = max(jv.max(), pv.max())
-    ax.set_ylim(0, top * 1.60)
+    ax.set_ylim(0, top * 1.42)                     # headroom for the key
     for i in np.where(bad)[0]:
-        ax.annotate("impossible,\nyet backed", (i + 0.19, top * 1.56),
-                    ha="center", va="top", fontsize=FS_LEGEND, color="#c1440e",
-                    linespacing=1.0)
-        ax.plot([i + 0.19, i + 0.19], [pv[i] + top * 0.02, top * 1.30],
-                color="#c1440e", lw=0.6, zorder=1)
+        # one short word: two lines were wide enough to reach the neighbouring
+        # bar once the composite narrows these panels
+        ax.annotate("impossible", (i + 0.19, pv[i]), textcoords="offset points",
+                    xytext=(0, 4), ha="center", va="bottom", fontsize=FS_LEGEND,
+                    color="#c1440e")
 
     ax.set_title(f"zone Z{zone.idx}, boundary UEs {ua} & {ub}", fontsize=FS_TITLE)
     ax.set_xticks(xs)
@@ -359,7 +355,7 @@ def panel_boundary(ax, item, inst, reports, zcol, first):
     ax.set_xlabel("joint choice of the two UEs", fontsize=FS_LABEL)
     if first:
         ax.set_ylabel("probability", fontsize=FS_LABEL)
-    ax.legend(fontsize=FS_LEGEND, framealpha=0.9, loc="upper left")
+    ax.legend(fontsize=FS_LEGEND, framealpha=0.9, loc="upper right")
     ax.tick_params(labelsize=FS_TICK)
 
 

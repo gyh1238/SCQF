@@ -222,10 +222,11 @@ strongly coupled, each for its most dependent pair.
 - **solid bars**: the zone's joint report, restricted to that pair.
 - **hatched bars**: the outer product of that zone's own marginals — what a
   marginal or preference exchange would reconstruct.
-- **red bar, annotated in place**: the product still backs a combination that
-  is absent from $\mathcal{F}_z$ altogether. Not rare — impossible: the two
-  UEs would break an owned RB or AP limit. It carries about a fifth of the
-  product's belief and exactly none of the joint's.
+- **red bar, marked "impossible"**: the product still backs a combination that
+  is absent from $\mathcal{F}_z$ altogether — the two UEs would break an owned
+  RB or AP limit. It carries about a fifth of the product's belief and exactly
+  none of the joint's, which is why it stands alone with no solid bar beside
+  it.
 
 **(c3): what losing them costs.** One point per instance. The horizontal axis
 is the utility reached when each zone's marginals are taken once and not
