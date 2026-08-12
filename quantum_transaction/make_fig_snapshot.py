@@ -121,10 +121,16 @@ def panel_map(ax, inst, part, active, zcol):
     both sides of a border, so every boundary UE is drawn joined to the APs
     that offer it a candidate; those links are the ones that cross a border.
     """
-    lo = inst.ue_xy.min(axis=0) - 0.15
-    hi = inst.ue_xy.max(axis=0) + 0.15
-    gx, gy = np.meshgrid(np.linspace(lo[0], hi[0], 420),
-                         np.linspace(lo[1], hi[1], 420))
+    # The territory shading has to cover the axes exactly, or the frame shows a
+    # white band where the grid stops.  Fix the extent first -- square, so that
+    # `aspect("equal")` cannot pad one side -- and build the grid on it.
+    lo = np.minimum(inst.ue_xy.min(axis=0), inst.ap_xy.min(axis=0)) - 0.30
+    hi = np.maximum(inst.ue_xy.max(axis=0), inst.ap_xy.max(axis=0)) + 0.30
+    span = float((hi - lo).max())
+    mid = 0.5 * (lo + hi)
+    lo, hi = mid - span / 2, mid + span / 2
+    gx, gy = np.meshgrid(np.linspace(lo[0], hi[0], 480),
+                         np.linspace(lo[1], hi[1], 480))
     d2 = ((gx[..., None] - inst.ap_xy[:, 0]) ** 2
           + (gy[..., None] - inst.ap_xy[:, 1]) ** 2)
     terr = part.zone_of[np.argmin(d2, axis=2)]           # zone owning each point
@@ -180,7 +186,8 @@ def panel_map(ax, inst, part, active, zcol):
                  f"({100*part.boundary_density:.0f}%)", fontsize=9, pad=6)
     ax.set_xticks([]); ax.set_yticks([])
     ax.set_aspect("equal")
-    ax.margins(0.03)
+    ax.set_xlim(lo[0], hi[0])
+    ax.set_ylim(lo[1], hi[1])
     ax.legend(handles=[
         Patch(facecolor="#bbbbbb", edgecolor="black", label="AP (colour = zone)"),
         plt.Line2D([], [], marker="o", ls="", mfc="white", mec="#c1440e",
