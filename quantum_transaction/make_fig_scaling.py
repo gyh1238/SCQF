@@ -96,7 +96,7 @@ COL = dict(ratio="#1f6fb4", zone="#2e8b57", cen="#c1440e", ceil="#8a8a8a")
 PANEL_DIR = "fig/panels"
 
 
-def _save(fig, stem, formats=("pdf", "svg"), **kw):
+def _save(fig, stem, formats=("pdf", "svg", "png"), **kw):
     """Every output is written on a transparent background."""
     for ext in formats:
         fig.savefig(f"{stem}.{ext}", transparent=True, **kw)
@@ -210,9 +210,9 @@ def plot(arr, skipped):
         f, a = plt.subplots(figsize=(5.4, 3.4))
         draw(a)
         f.tight_layout()
-        _save(f, f"{PANEL_DIR}/{stem}")
+        _save(f, f"{PANEL_DIR}/{stem}", dpi=200)
         plt.close(f)
-    print(f"wrote {len(specs)} standalone panels to {PANEL_DIR}/ (pdf + svg)")
+    print(f"wrote {len(specs)} standalone panels to {PANEL_DIR}/ (pdf + svg + png)")
 
     # ---- console summary -------------------------------------------------
     print("\n zones   UEs   ratio%      max zone 2q     centralized 2q   |B|%")

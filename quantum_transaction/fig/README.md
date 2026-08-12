@@ -12,25 +12,27 @@ a slide or a paper column without a white box.
 | `fig_scaling.pdf` / `.png` | composite: what stays bounded as the region grows |
 | `panels/*.pdf` | each panel alone, vector, for LaTeX `\includegraphics` |
 | `panels/*.svg` | each panel alone, vector, for editing in Inkscape/Illustrator |
+| `panels/*.png` | each panel alone, raster at 200 dpi, for quick viewing |
+| `seed_preview.png` | candidate snapshot regions side by side (`preview_seeds.py`) |
 
 Panels:
 
 | file | panel |
 |---|---|
 | `panels/snapshot_a_partition.*` | (a) the partition |
-| `panels/snapshot_b1_zone_law_Z3.*` | (b1) zone Z3 accepted law |
-| `panels/snapshot_b2_zone_law_Z5.*` | (b2) zone Z5 accepted law |
-| `panels/snapshot_b3_zone_law_Z11.*` | (b3) zone Z11 accepted law |
-| `panels/snapshot_b4_zone_law_Z8.*` | (b4) zone Z8 accepted law |
-| `panels/snapshot_c1_joint_Z11_UE1_26.*` | (c1) joint vs. marginals, zone Z11 |
-| `panels/snapshot_c2_joint_Z9_UE45_49.*` | (c2) joint vs. marginals, zone Z9 |
-| `panels/snapshot_c3_joint_Z12_UE7_33.*` | (c3) joint vs. marginals, zone Z12 |
+| `panels/snapshot_b1_zone_law_Z7.*` | (b1) zone Z7 accepted law |
+| `panels/snapshot_b2_zone_law_Z6.*` | (b2) zone Z6 accepted law |
+| `panels/snapshot_b3_zone_law_Z5.*` | (b3) zone Z5 accepted law |
+| `panels/snapshot_b4_zone_law_Z4.*` | (b4) zone Z4 accepted law |
+| `panels/snapshot_c1_joint_Z10_UE38_40.*` | (c1) joint vs. marginals, zone Z10 |
+| `panels/snapshot_c2_joint_Z9_UE25_38.*` | (c2) joint vs. marginals, zone Z9 |
+| `panels/snapshot_c3_joint_Z0_UE1_25.*` | (c3) joint vs. marginals, zone Z0 |
 | `panels/snapshot_d_decimation_order.*` | (d) order the boundary UEs were fixed |
 | `panels/scaling_a_circuit_cost.*` | (a) two-qubit gate count vs. zones |
 | `panels/scaling_b_utility_ratio.*` | (b) utility ratio vs. zones |
 
 The zone indices and UE indices in the panel names are those of the snapshot
-instance (`g=5, seed=0`); they change if that instance changes, and each
+instance (`g=5, seed=7`); they change if that instance changes, and each
 script clears its own panels before writing so stale names cannot linger.
 
 Regenerate everything with:
@@ -156,9 +158,14 @@ growing `g` grows the *global* problem without changing local structure.
 
 ## 3. `fig_snapshot` — one region, opened up
 
-Instance `g=5, seed=0`: 25 APs, 50 UEs, 13 zones, 23 boundary UEs (46 %).
-It is the **median** of 8 seeds by utility ratio, so the picture is typical
-rather than selected.
+Instance `g=5, seed=7`: 25 APs, 50 UEs, 11 zones, 22 boundary UEs (44 %).
+
+The seed is chosen for legibility — compact zones, none of them holding a
+single UE, boundary links that can be traced. To keep that presentation choice
+from turning into a quality one, the caption reports where this instance's
+utility ratio falls among the candidates: 99.2 % against a candidate mean of
+99.3 % and a spread of 97.7–100 %. `preview_seeds.py` renders the candidates
+side by side and prints the numbers behind the choice.
 
 ### (a) the partition
 
@@ -222,15 +229,14 @@ This is the panel that justifies sending a distribution-valued report rather
 than a preference. Sec. IV-C states that the product of single-UE marginals is
 only a one-pass consensus estimate and that the correlations among several
 boundary UEs live in the joint list; the panels measure that gap at
-TV = 0.33–0.37, and show the sharper version of it: in every panel there is a
+TV = 0.37–0.40, and show the sharper version of it: in every panel there is a
 configuration the joint gives exactly zero probability while the product gives
-it 16–19 %. A protocol that exchanged marginals would spend a sixth of its
+it 19–20 %. A protocol that exchanged marginals would spend a sixth of its
 belief on assignments that cannot exist.
 
-Across the whole snapshot instance the same comparison over each zone's full
-boundary block gives TV = 0.56, 0.43, 0.42, 0.30 in the four zones where the
-owned limits couple boundary UEs, and exactly 0 in the nine zones where they
-do not — the correlation appears precisely where the constraints bind.
+The same comparison over a zone's full boundary block is larger still, and it
+is exactly 0 in the zones whose owned limits do not couple their boundary UEs
+— the correlation appears precisely where the constraints bind.
 
 ### (d) the order decimation fixed the boundary UEs
 

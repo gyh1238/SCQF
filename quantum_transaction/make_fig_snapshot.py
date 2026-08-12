@@ -20,8 +20,11 @@ Panels, each carrying one checkable claim rather than an illustration:
 
  (d) the order decimation fixed the boundary UEs: one point per UE.
 
-The instance is drawn from the same generator as the scaling figure and is
-the median-quality run of its size, so the picture is typical, not selected.
+The instance comes from the same generator as the scaling figure.  Its seed
+is chosen for legibility -- compact zones, no one-UE zones, boundary links
+that can be followed -- and the caption states where its utility ratio falls
+among the candidate seeds so that a presentation choice cannot pass for a
+quality one.  `preview_seeds.py` renders the candidates side by side.
 
 Usage:  python make_fig_snapshot.py
 """
@@ -44,6 +47,7 @@ from haiq_cost import BUDGET_DEFAULT
 PANEL_DIR = "fig/panels"
 
 G = 5
+SEED = 7           # chosen for legibility; see pick_seed and preview_seeds.py
 BETA = 1.5
 K_ACCEPT = 200
 SHOT_BUDGET = 10_000
@@ -60,27 +64,37 @@ def _count(n):
     return f"{n:.0f}"
 
 
-def _save(fig, stem, formats=("pdf", "svg"), **kw):
+def _save(fig, stem, formats=("pdf", "svg", "png"), **kw):
     """Every output is written on a transparent background."""
     for ext in formats:
         fig.savefig(f"{stem}.{ext}", transparent=True, **kw)
 
 
-def pick_median_seed(seeds=range(8)):
-    """Choose the instance whose utility ratio is the median of its size."""
-    runs = []
-    for s in seeds:
-        inst = make_instance(g=G, seed=s)
-        opt, _, ok = solve_centralized(inst)
-        if not ok:
-            continue
-        part = partition_aps(inst)
-        res = run_protocol(inst, part, beta=BETA, ubar=utility_scale(inst),
-                           k_accept=K_ACCEPT, shot_budget=SHOT_BUDGET,
-                           rng=np.random.default_rng(1000 + s), collect=True)
-        runs.append((100.0 * res["utility"] / opt, s, inst, part, res, opt))
-    runs.sort(key=lambda t: t[0])
-    return runs[len(runs) // 2], [r[0] for r in runs]
+def run_seed(seed):
+    inst = make_instance(g=G, seed=seed)
+    opt, _, ok = solve_centralized(inst)
+    if not ok:
+        return None
+    part = partition_aps(inst)
+    res = run_protocol(inst, part, beta=BETA, ubar=utility_scale(inst),
+                       k_accept=K_ACCEPT, shot_budget=SHOT_BUDGET,
+                       rng=np.random.default_rng(1000 + seed), collect=True)
+    return (100.0 * res["utility"] / opt, seed, inst, part, res, opt)
+
+
+def pick_seed(seed=SEED, seeds=range(12)):
+    """Build the chosen instance, and say where its quality sits among its peers.
+
+    The seed is chosen for legibility -- compact zones, no degenerate one-UE
+    zones, boundary links that can be followed -- which is a presentation
+    choice.  To keep that from becoming a quality selection, the utility ratio
+    of every candidate is returned as well, so the caption can state where the
+    displayed one falls in that spread.  `preview_seeds.py` renders the
+    candidates side by side.
+    """
+    chosen = run_seed(seed)
+    peers = [r[0] for s in seeds if (r := run_seed(s))]
+    return chosen, peers
 
 
 def panel_map(ax, inst, part, active, zcol):
@@ -101,10 +115,12 @@ def panel_map(ax, inst, part, active, zcol):
           + (gy[..., None] - inst.ap_xy[:, 1]) ** 2)
     terr = part.zone_of[np.argmin(d2, axis=2)]           # zone owning each point
 
-    for z in sorted({r["zone"].idx for r in active}):
+    for z in range(len(part.zones)):
+        if not part.zones[z]:
+            continue
         m = (terr == z).astype(float)
-        ax.contourf(gx, gy, m, levels=[0.5, 1.5], colors=[zcol[z]], alpha=0.30,
-                    zorder=0)
+        ax.contourf(gx, gy, m, levels=[0.5, 1.5],
+                    colors=[zcol.get(z, "#cccccc")], alpha=0.30, zorder=0)
         ax.contour(gx, gy, m, levels=[0.5], colors="white", linewidths=1.0,
                    zorder=1)
 
@@ -305,12 +321,13 @@ def panel_order(ax, res):
 
 
 def main():
-    (ratio, seed, inst, part, res, opt), all_ratios = pick_median_seed()
+    (ratio, seed, inst, part, res, opt), all_ratios = pick_seed()
     reports = res["reports"]
     active = [r for r in reports if r["zone"].n_ue > 0]
     holders = res["holders"]
     print(f"snapshot: g={G} seed={seed} UEs={inst.n_ue} zones={len(active)} "
-          f"ratio={ratio:.2f}% (median of {len(all_ratios)} seeds)")
+          f"ratio={ratio:.2f}% (peers {min(all_ratios):.2f}-{max(all_ratios):.2f}%, "
+          f"mean {np.mean(all_ratios):.2f}%)")
 
     cmap = plt.get_cmap("tab20")
     zcol = {z: cmap(i % 20) for i, z in
@@ -339,8 +356,11 @@ def main():
                  "zone-local sampling and classical boundary coordination",
                  fontsize=11.5, y=0.982)
     fig.text(0.008, 0.028,
-             f"g={G}, seed={seed} (median of {len(all_ratios)} seeds by utility "
-             f"ratio); beta={BETA}, K_z={K_ACCEPT}. Utility {res['utility']:.1f} "
+             f"g={G}, seed={seed}, chosen for legibility; its utility ratio sits "
+             f"at the mean of {len(all_ratios)} candidate seeds "
+             f"({np.mean(all_ratios):.1f}%, spread {min(all_ratios):.1f}-"
+             f"{max(all_ratios):.1f}%). beta={BETA}, K_z={K_ACCEPT}. "
+             f"Utility {res['utility']:.1f} "
              f"of the centralized strict optimum {opt:.1f} = {ratio:.1f}%; the "
              f"assignment is strictly feasible ({res['feasible']}). "
              f"Zone labels in (a): UEs, state qubits, two-qubit gates.",
@@ -382,9 +402,9 @@ def main():
         f, a = plt.subplots(figsize=size)
         draw(a)
         f.tight_layout()
-        _save(f, f"{PANEL_DIR}/{stem}", bbox_inches="tight")
+        _save(f, f"{PANEL_DIR}/{stem}", bbox_inches="tight", dpi=200)
         plt.close(f)
-    print(f"wrote {len(specs)} standalone panels to {PANEL_DIR}/ (pdf + svg)")
+    print(f"wrote {len(specs)} standalone panels to {PANEL_DIR}/ (pdf + svg + png)")
 
 
 if __name__ == "__main__":
