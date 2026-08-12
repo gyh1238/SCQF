@@ -29,7 +29,8 @@ Panels:
 | `panels/snapshot_c3_ablation_joint_vs_marginals.*` | (c3) what dropping the joint list costs |
 | `panels/snapshot_d_decimation_order.*` | (d) order the boundary UEs were fixed |
 | `panels/scaling_a_circuit_cost.*` | (a) two-qubit gate count vs. zones |
-| `panels/scaling_b_utility_ratio.*` | (b) utility ratio vs. zones |
+| `panels/scaling_b_coordination_cost.*` | (b) classical report volume vs. zones |
+| `panels/scaling_c_utility_ratio.*` | (c) utility ratio vs. zones |
 
 The zone indices and UE indices in the panel names are those of the snapshot
 instance (`g=5, seed=7`); they change if that instance changes, and each
@@ -134,6 +135,12 @@ simply $K_z/\mu_z$.
 | partition budget | the per-zone two-qubit ceiling the partitioner must respect | 2000 |
 | Heron2 half-signal | measured on ibm_kingston: decay $0.00118$ per 2q gate $\Rightarrow$ 50 % signal at | 587 |
 | Heron3 half-signal | estimated for ibm_boston: decay $0.00068$ per 2q gate $\Rightarrow$ 50 % signal at | 1019 |
+
+The two device points are why the partition budget is a two-qubit count
+rather than a qubit count. They are not drawn on the figures: the budget line
+is the constraint the partitioner actually enforces, and adding device
+ceilings beside it invited the figure to be read as a claim about which
+processor runs this today, which is a separate question.
 
 > **Symbol clash worth knowing.** `HARDWARE_LIMITS.md` uses $\lambda$ for the
 > per-gate decay rate, while the manuscript uses $\lambda$ for the Gibbs
@@ -277,42 +284,57 @@ the run needed.
 
 40 instances: 7 region sizes × 6 seeds, minus 2 globally infeasible draws.
 Each marker is the mean over the seeds at one size; shading is one standard
-deviation. Both panels share the growth axis.
+deviation. All three panels share the growth axis.
 
-**x (both panels)**: the number of zones the partitioner produced, averaged
-over seeds. The lower tick row on panel (b) gives the corresponding UE count,
-so the axis reads in both units: 5 zones / 18 UEs up to 45 zones / 162 UEs.
+**x (all panels)**: the number of zones the partitioner produced, averaged over
+seeds. The lower tick row on panel (c) gives the corresponding UE count, so the
+axis reads in both units: 5 zones / 18 UEs up to 45 zones / 162 UEs.
 
 ### (a) circuit cost
 
 - **y**: two-qubit gates for one oracle pass, log scale.
 - **red squares, dashed**: the centralized circuit — one circuit for the whole
-  region. The plotted means grow 10.8 k → 174 k.
-- **green circles, solid**: the largest zone circuit, $\max_z$, with a ±1 σ
-  band. Flat at 1.7 k – 2.0 k; no single zone exceeded the 2000 budget.
+  region. **×16** across the range.
+- **green circles, solid**: the largest zone circuit, $\max_z$, with a ±1σ
+  band. **×1.15** across the same range, i.e. flat.
 - **green dashed line**: the 2000 partition budget the green curve respects.
-- **grey dotted / dash-dot lines**: the measured Heron2 and Heron3 half-signal
-  points, for scale.
 
 Comparing at one oracle pass is deliberate and conservative. Neither curve
 includes amplification, which the figures do not use; if it were added, the
 centralized circuit would need *more* rounds than a zone because its accepted
 mass is smaller, so the gap shown understates the real one.
 
-### (b) utility ratio
+### (b) coordination cost
+
+- **y**: the classical report volume for one coordination round, log scale.
+  A report is $K_z$ boundary code words plus one utility scalar per retained
+  draw.
+- **red squares, dashed**: the whole region. **×8.6** for **×8.4** zones — it
+  tracks the zone count, not something worse.
+- **green circles, solid**: what a single zone sends. **×1.01**, i.e. a zone's
+  message does not notice how large the region became.
+
+This is the panel that answers the obvious objection to (a): bounding the
+per-zone circuit is not interesting if the coordination it requires explodes
+instead. It does not. Sec. V-D argues this in prose — that under bounded zone
+density the largest $Q_z$ is independent of the number of zones while the
+report grows only with the overlap — and this is that statement measured.
+
+### (c) utility ratio
 
 - **y**: utility of the distributed result as a percentage of the centralized
   strict optimum, computed exactly by MILP (HiGHS) on the same instance.
 - **grey line at 100 %**: the optimum.
-- **blue triangles with band**: mean ± 1 σ over seeds, 99.1 – 99.7 %. Single
-  instances span 98.1 – 100.0 %.
+- **blue triangles with band**: mean ± 1σ over seeds, 98.8 – 99.9 %.
 
 The centralized optimum appears only as the denominator; it is not a competing
-protocol. Flat here means decomposition and boundary coordination cost about
-1 % of utility, and that this does not worsen as the region grows.
+protocol. Flat here means decomposition, the shot budget and boundary
+coordination together cost about a point of utility, and that this does not
+worsen as the region grows.
 
-Read together: the centralized circuit leaves the executable region while the
-zone circuits stay inside it, at unchanged solution quality.
+Read together: the work one processor does and the traffic one zone sends are
+both unchanged across a nine-fold growth in problem size, while the
+centralized circuit and the total traffic grow with it, at no cost in quality.
 
 ## 5. Editing notes
 

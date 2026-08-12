@@ -6,18 +6,18 @@ coverage radius and candidate degree, so the *global* problem grows while
 local density does not.  The partitioner then emits more zones of roughly
 constant size rather than larger zones.
 
-Left axis  -- utility of the distributed result as a fraction of the
-              centralized strict optimum (MILP).  Flat means decomposition
-              and boundary coordination cost essentially nothing.
-Right axis -- two-qubit gate count of one compute-mark-uncompute pass:
-              the largest zone-local circuit (bounded) against the single
-              centralized circuit (growing), with the measured Heron2 and
-              Heron3 ceilings for reference.
+(a) two-qubit gates of one oracle pass -- the single centralized circuit
+    against the largest zone circuit, with the budget the partitioner
+    respects;
+(b) classical coordination traffic -- the whole region against one zone;
+(c) utility of the distributed result as a fraction of the centralized
+    strict optimum (MILP).
 
-Together: the centralized circuit leaves the executable region while the
-zone-local circuits stay inside it at unchanged solution quality.  That is
-the scalable-execution claim, with no competing protocol required -- the
-centralized optimum enters only as the denominator.
+Read together: the work one processor has to do, and the traffic one zone
+has to send, are both unchanged as the region grows, while the centralized
+circuit and the total traffic grow with it -- at no cost in solution
+quality.  No competing protocol is needed for this; the centralized optimum
+enters only as the denominator of (c).
 
 Usage:  python make_fig_scaling.py [--recollect]
 """
@@ -35,7 +35,7 @@ from matplotlib.colors import to_rgb
 
 from haiq_instance import make_instance, utility_scale
 from haiq_partition import partition_aps
-from haiq_cost import centralized_2q_cost, CEIL_KINGSTON, CEIL_BOSTON, BUDGET_DEFAULT
+from haiq_cost import centralized_2q_cost, BUDGET_DEFAULT
 from haiq_protocol import run_protocol
 from haiq_reference import solve_centralized
 
@@ -117,16 +117,11 @@ def _tint(color, frac):
 
 
 def panel_cost(ax, x, z2q, z2lo, z2hi, c2q, title=False, standalone=False):
-    """(a) two-qubit gate count of one oracle pass against the growth axis."""
+    """(a) two-qubit gates of one oracle pass: centralized against per zone."""
     ax.set_yscale("log")
-    ax.axhline(CEIL_KINGSTON, color=COL["ceil"], ls=":", lw=1.2)
-    ax.axhline(CEIL_BOSTON, color=COL["ceil"], ls="-.", lw=1.2)
-    ax.axhline(BUDGET_DEFAULT, color=_tint(COL["zone"], 0.6), ls="--", lw=1.0)
-    ax.text(x[0], CEIL_KINGSTON * 0.80, "Heron2 half-signal (measured)",
-            ha="left", va="top", fontsize=7, color="#5a5a5a")
-    ax.text(x[0], CEIL_BOSTON * 0.80, "Heron3 half-signal (measured)",
-            ha="left", va="top", fontsize=7, color="#5a5a5a")
-    ax.text(x[-1], BUDGET_DEFAULT * 1.15, f"partition budget {BUDGET_DEFAULT}",
+    ax.axhline(BUDGET_DEFAULT, color=COL["zone"], ls="--", lw=1.0,
+               dashes=(4, 3), alpha=0.9)
+    ax.text(x[-1], BUDGET_DEFAULT * 1.18, f"partition budget {BUDGET_DEFAULT}",
             ha="right", va="bottom", fontsize=7, color=COL["zone"])
 
     ax.plot(x, c2q, "s--", color=COL["cen"], ms=5, lw=1.8,
@@ -134,8 +129,14 @@ def panel_cost(ax, x, z2q, z2lo, z2hi, c2q, title=False, standalone=False):
     ax.fill_between(x, z2lo, z2hi, color=_tint(COL["zone"], 0.20), lw=0)
     ax.plot(x, z2q, "o-", color=COL["zone"], ms=5, lw=1.8,
             label="distributed: largest zone circuit")
+    ax.annotate(f"×{c2q[-1]/c2q[0]:.0f} across this range", (x[-1], c2q[-1]),
+                textcoords="offset points", xytext=(-6, 8), ha="right",
+                fontsize=7.5, color=COL["cen"])
+    ax.annotate(f"×{z2q[-1]/z2q[0]:.2f}", (x[-1], z2q[-1]),
+                textcoords="offset points", xytext=(-6, -13), ha="right",
+                fontsize=7.5, color=COL["zone"])
     ax.set_ylabel("two-qubit gates\n(one oracle pass)", fontsize=9.5)
-    ax.set_ylim(2.5e2, max(c2q) * 4)
+    ax.set_ylim(min(z2q) / 3, max(c2q) * 6)
     ax.legend(loc="upper left", fontsize=8, framealpha=0.95)
     ax.grid(alpha=0.25, which="both", lw=0.5)
     if title:
@@ -144,8 +145,29 @@ def panel_cost(ax, x, z2q, z2lo, z2hi, c2q, title=False, standalone=False):
         ax.set_xlabel("zones after partitioning", fontsize=10)
 
 
+def panel_comm(ax, x, tot_kb, per_kb, standalone=False):
+    """(b) classical coordination traffic, in total and per zone."""
+    ax.set_yscale("log")
+    ax.plot(x, tot_kb, "s--", color=COL["cen"], ms=5, lw=1.8,
+            label="whole region, one round")
+    ax.plot(x, per_kb, "o-", color=COL["zone"], ms=5, lw=1.8,
+            label="per zone")
+    ax.annotate(f"×{tot_kb[-1]/tot_kb[0]:.1f} for ×{x[-1]/x[0]:.1f} zones",
+                (x[-1], tot_kb[-1]), textcoords="offset points",
+                xytext=(-6, 8), ha="right", fontsize=7.5, color=COL["cen"])
+    ax.annotate(f"×{per_kb[-1]/per_kb[0]:.2f}", (x[-1], per_kb[-1]),
+                textcoords="offset points", xytext=(-6, -13), ha="right",
+                fontsize=7.5, color=COL["zone"])
+    ax.set_ylabel("classical report\n[kB]", fontsize=9.5)
+    ax.set_ylim(min(per_kb) / 3, max(tot_kb) * 6)
+    ax.legend(loc="upper left", fontsize=8, framealpha=0.95)
+    ax.grid(alpha=0.25, which="both", lw=0.5)
+    if standalone:
+        ax.set_xlabel("zones after partitioning", fontsize=10)
+
+
 def panel_quality(ax, x, ratio, rlo, rhi, n_ues, standalone=False):
-    """(b) distributed utility as a fraction of the centralized strict optimum."""
+    """(c) distributed utility as a fraction of the centralized strict optimum."""
     ax.axhline(100, color="#999999", lw=0.9, ls="-")
     ax.fill_between(x, rlo, rhi, color=_tint(COL["ratio"], 0.22), lw=0)
     ax.plot(x, ratio, "^-", color=COL["ratio"], ms=6, lw=2.0,
@@ -154,7 +176,6 @@ def panel_quality(ax, x, ratio, rlo, rhi, n_ues, standalone=False):
     ax.set_ylabel("utility vs.\ncentralized optimum  [%]", fontsize=9.5)
     ax.legend(loc="lower left", fontsize=8, framealpha=0.95)
     ax.grid(alpha=0.25, lw=0.5)
-    # the growth axis reads in both units: zones produced, and UEs in the region
     ax.set_xticks(x)
     ax.set_xticklabels([f"{xi:.0f}\n{nu:.0f}" for xi, nu in zip(x, n_ues)],
                        fontsize=8.5)
@@ -184,16 +205,21 @@ def plot(arr, skipped):
 
     n_ues = [arr[arr[:, cols["g"]] == g, cols["n_ue"]].mean() for g in gs]
 
-    fig, (ax_c, ax_q) = plt.subplots(
-        2, 1, figsize=(6.9, 6.2), sharex=True,
-        gridspec_kw=dict(height_ratios=[1.25, 1]))
+    _, bits, _, _ = agg("bits")
+    tot_kb = bits / 8 / 1024
+    per_kb = tot_kb / x
+
+    fig, (ax_c, ax_m, ax_q) = plt.subplots(
+        3, 1, figsize=(6.9, 8.0), sharex=True,
+        gridspec_kw=dict(height_ratios=[1.15, 1.15, 1]))
     panel_cost(ax_c, x, z2q, z2lo, z2hi, c2q, title=True)
+    panel_comm(ax_m, x, tot_kb, per_kb)
     panel_quality(ax_q, x, ratio, rlo, rhi, n_ues)
 
     feas = arr[:, cols["feas"]].mean() * 100
     fig.text(0.013, 0.055,
              f"{len(arr)} instances, {len(SEEDS)} seeds per size; shading is one "
-             f"standard deviation (beta={BETA}, K_z={K_ACCEPT})"
+             f"standard deviation. beta={BETA}, K_z={K_ACCEPT}"
              + (f"; {skipped} globally infeasible instances excluded." if skipped
                 else "."),
              fontsize=7, color="#555555")
@@ -201,7 +227,7 @@ def plot(arr, skipped):
              f"Every accepted assignment satisfies the original constraints; "
              f"{feas:.0f}% of runs closed on a strictly feasible global assignment.",
              fontsize=7, color="#555555")
-    fig.subplots_adjust(left=0.135, right=0.98, top=0.925, bottom=0.175,
+    fig.subplots_adjust(left=0.135, right=0.98, top=0.945, bottom=0.135,
                         hspace=0.14)
     os.makedirs("fig", exist_ok=True)
     _save(fig, "fig/fig_scaling", formats=("pdf", "png"), dpi=200)
@@ -217,7 +243,9 @@ def plot(arr, skipped):
     specs = [
         ("scaling_a_circuit_cost",
          lambda ax: panel_cost(ax, x, z2q, z2lo, z2hi, c2q, standalone=True)),
-        ("scaling_b_utility_ratio",
+        ("scaling_b_coordination_cost",
+         lambda ax: panel_comm(ax, x, tot_kb, per_kb, standalone=True)),
+        ("scaling_c_utility_ratio",
          lambda ax: panel_quality(ax, x, ratio, rlo, rhi, n_ues, standalone=True)),
     ]
     for stem, draw in specs:
