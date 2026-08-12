@@ -188,12 +188,8 @@ def panel_zone_law(ax, r, zcol, first):
     ax.text(len(ref) + pad * 0.55, ax.get_ylim()[1] * 0.5, "infeasible:\nzero mass",
             fontsize=5.8, color="#c1440e", ha="center", va="center")
     ax.set_xlim(-0.8, len(ref) + pad)
-    back = ("executed at target $\\beta$" if r["beta_z"] >= BETA - 1e-6
-            else f"executed at $\\beta_z$={r['beta_z']:.2f}, reweighted")
     ax.set_title(f"zone Z{zone.idx}: $N_z$={zone.n_ue}, "
-                 f"$|\\mathcal{{F}}_z|$={len(ref)}\n"
-                 f"$\\mu_z$={r['mu']:.3f}, {_count(r['shots'])} shots, "
-                 f"ESS {r['ess']:.0f}/{r['k_eff']}\n{back}", fontsize=7)
+                 f"$|\mathcal{{F}}_z|$={len(ref)}", fontsize=8)
     ax.set_xlabel("assignment, ranked by $J_z$", fontsize=7)
     if first:
         ax.set_ylabel("accepted probability", fontsize=8)
@@ -288,9 +284,7 @@ def main():
                  fontsize=11.5, y=0.982)
     fig.text(0.008, 0.028,
              f"g={G}, seed={seed} (median of {len(all_ratios)} seeds by utility "
-             f"ratio); target beta={BETA}, K_z={K_ACCEPT}, shot budget "
-             f"{SHOT_BUDGET:,}/zone ({res['n_backed_off']} zones executed at a "
-             f"lower beta_z and were reweighted). Utility {res['utility']:.1f} "
+             f"ratio); beta={BETA}, K_z={K_ACCEPT}. Utility {res['utility']:.1f} "
              f"of the centralized strict optimum {opt:.1f} = {ratio:.1f}%; the "
              f"assignment is strictly feasible ({res['feasible']}). "
              f"Zone labels in (a): UEs, state qubits, two-qubit gates.",

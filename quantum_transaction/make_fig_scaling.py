@@ -179,8 +179,7 @@ def plot(arr, skipped):
     feas = arr[:, cols["feas"]].mean() * 100
     fig.text(0.013, 0.055,
              f"{len(arr)} instances, {len(SEEDS)} seeds per size; shading is one "
-             f"standard deviation (target beta={BETA}, K_z={K_ACCEPT}, "
-             f"shot budget {SHOT_BUDGET:,}/zone)"
+             f"standard deviation (beta={BETA}, K_z={K_ACCEPT})"
              + (f"; {skipped} globally infeasible instances excluded." if skipped
                 else "."),
              fontsize=7, color="#555555")

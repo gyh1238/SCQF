@@ -112,45 +112,12 @@ simply $K_z/\mu_z$.
 > $1/\mu_z \rightarrow 1/\sqrt{\mu_z}$ gain from amplification is real, but it
 > is not what these figures measure.
 
-### Execution exponent and reconstruction (Sec. IV-C)
-
-A tight zone has a small $\mu_z$, and at $k=0$ the cost of $K_z$ accepted draws
-is $K_z/\mu_z$ — which for the tightest zones ran to $10^6$–$10^8$ shots, far
-past any real run. The remedy is the manuscript's own: **a zone executes at the
-largest exponent its shot budget allows, and the target exponent is restored
-after measurement rather than before it.**
-
-| symbol | meaning | value |
-|---|---|---|
-| shot budget | shots one zone may spend on its report | 10 000 |
-| $\beta_z \le \beta$ | exponent zone $z$ actually executes, the largest with $K_z/\mu_z(\beta_z)\le$ budget | 0.08 – 1.50 |
-| $w^{(k)}=\exp[(\lambda-\lambda_z)J_z^{(k)}]$ | reconstruction weight of draw $k$ | 1 when $\beta_z=\beta$ |
-| $\widetilde K_z=(\sum w)^2/\sum w^2$ | effective sample size after reweighting | $\ge 73$ of $K_z=200$ |
-
-A lower $\beta_z$ makes the accepted law flatter and therefore cheaper to hit;
-the reweighting puts each draw back on the target exponent, and the price is
-paid in effective sample size, not in bias. $\widetilde K_z$ is the honest
-sample count behind a zone's report and is what the exception threshold
-$K_{\min}$ is compared against.
-
-**What the budget costs.** Over 16 instances, capping every zone at 10 000
-shots against no cap at all:
-
-| | utility vs. optimum | worst instance | peak shots in a zone |
-|---|---|---|---|
-| shot budget 10 000 | 99.26 % | 97.99 % | $10^4$ |
-| no budget | 99.31 % | 98.72 % | $2.6\times10^8$ |
-
-A 25 000-fold reduction in the worst zone's shot count costs 0.05 percentage
-points of utility on average, and under 1 point on the worst instance. That is
-the accuracy deliberately traded away to make the protocol executable, and it
-is why the (b) panels are noisier than an unbudgeted run would give.
-
 ### Coordination (Sec. IV-C)
 
 | symbol | meaning | value |
 |---|---|---|
 | $K_z$ | accepted draws each zone reports | 200 |
+| $eta_z\leeta$ | exponent a zone actually executes; see Sec. 6 | 0.08 – 1.50 |
 | $K_{\min}$ | effective-sample floor that triggers re-sampling | 25 |
 | $\pi_{z,i}(v)$ | marginal of boundary UE $i$ held by zone $z$ (Laplace-smoothed, $\alpha=0.5$) | — |
 | $b_i(v)\propto\prod_z\pi_{z,i}(v)$ | consensus belief over UE $i$'s candidates | — |
@@ -318,3 +285,38 @@ zone circuits stay inside it, at unchanged solution quality.
   backdrop is assumed.
 - Composite layouts are set with `subplots_adjust`, not `tight_layout`, so
   panel positions are stable when labels change length.
+
+## 6. Supplementary: how the reports are paid for
+
+None of this appears on the figures; it is recorded here because the
+numbers behind them depend on it. A tight zone has a small $\mu_z$, and at $k=0$ the cost of $K_z$ accepted draws
+is $K_z/\mu_z$ — which for the tightest zones ran to $10^6$–$10^8$ shots, far
+past any real run. The remedy is the manuscript's own: **a zone executes at the
+largest exponent its shot budget allows, and the target exponent is restored
+after measurement rather than before it.**
+
+| symbol | meaning | value |
+|---|---|---|
+| shot budget | shots one zone may spend on its report | 10 000 |
+| $\beta_z \le \beta$ | exponent zone $z$ actually executes, the largest with $K_z/\mu_z(\beta_z)\le$ budget | 0.08 – 1.50 |
+| $w^{(k)}=\exp[(\lambda-\lambda_z)J_z^{(k)}]$ | reconstruction weight of draw $k$ | 1 when $\beta_z=\beta$ |
+| $\widetilde K_z=(\sum w)^2/\sum w^2$ | effective sample size after reweighting | $\ge 73$ of $K_z=200$ |
+
+A lower $\beta_z$ makes the accepted law flatter and therefore cheaper to hit;
+the reweighting puts each draw back on the target exponent, and the price is
+paid in effective sample size, not in bias. $\widetilde K_z$ is the honest
+sample count behind a zone's report and is what the exception threshold
+$K_{\min}$ is compared against.
+
+**What the budget costs.** Over 16 instances, capping every zone at 10 000
+shots against no cap at all:
+
+| | utility vs. optimum | worst instance | peak shots in a zone |
+|---|---|---|---|
+| shot budget 10 000 | 99.26 % | 97.99 % | $10^4$ |
+| no budget | 99.31 % | 98.72 % | $2.6\times10^8$ |
+
+A 25 000-fold reduction in the worst zone's shot count costs 0.05 percentage
+points of utility on average, and under 1 point on the worst instance. That is
+the accuracy deliberately traded away to make the protocol executable, and it
+is why the (b) panels are noisier than an unbudgeted run would give.
