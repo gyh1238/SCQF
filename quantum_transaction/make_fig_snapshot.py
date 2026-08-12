@@ -12,10 +12,11 @@ Panels, each carrying one checkable claim rather than an illustration:
      stays readable at any zone size.  Ranks outside F_z carry exactly zero
      mass, which is strict feasibility made visible;
 
- (c) boundary coordination -- for the most contested boundary UEs, the
-     marginals held by each owning zone, their product b_i, and the value
-     decimation committed.  This is what the retained joint list buys and
-     what a scalar-preference exchange cannot reproduce;
+ (c) what the retained joint report carries that a marginal exchange would
+     not: for the most dependent pairs of boundary UEs, the zone's joint
+     against the product of its own marginals.  The paper states that the
+     product of single-UE marginals is only a one-pass consensus estimate and
+     that the correlations live in the joint list; this is that gap, measured;
 
  (d) the order decimation fixed the boundary UEs: one point per UE.
 
@@ -193,40 +194,93 @@ def panel_zone_law(ax, r, zcol, first):
     ax.set_xlabel("assignment, ranked by $J_z$", fontsize=7)
     if first:
         ax.set_ylabel("accepted probability", fontsize=8)
-        ax.legend(fontsize=6.2, framealpha=0.9, loc="upper right")
+    ax.legend(fontsize=6.2, framealpha=0.9, loc="upper right")
     ax.tick_params(labelsize=6.5)
 
 
-def panel_boundary(ax, t, inst, reports, holders, zcol, first):
-    """(c) competing zone marginals, their product, and the committed value."""
-    i = t["ue"]
-    n_val = len(inst.cand[i])
-    hs = holders[i]
-    width = 0.8 / (len(hs) + 1)
-    xs = np.arange(n_val)
-    for hj, (ri, k) in enumerate(hs):
-        rep = reports[ri]
-        c = np.bincount(rep["codes"][:, k], minlength=n_val).astype(float)
-        c = (c + 0.5) / (c.sum() + 0.5 * n_val)
-        ax.bar(xs + hj * width - 0.4 + width / 2, c, width=width * 0.9,
-               color=zcol.get(rep["zone"].idx, "#888"), alpha=0.9,
-               label=f"$\\pi_{{Z{rep['zone'].idx}}}$")
-    ax.bar(xs + len(hs) * width - 0.4 + width / 2, t["belief"],
-           width=width * 0.9, color="#222222", alpha=0.9, label="$b_i$")
-    ax.axvspan(t["value"] - 0.47, t["value"] + 0.47, color="#c1440e", alpha=0.13,
-               lw=0, zorder=0)
-    owners = " + ".join(f"Z{reports[ri]['zone'].idx}" for ri, _ in hs)
-    ax.set_title(f"boundary UE {i}:  {owners}\nconfidence {t['conf']:.2f}",
-                 fontsize=7.5)
+def strongest_pair(rep):
+    """The most dependent pair of boundary UEs in a zone's report.
+
+    Returns (tv, ka, kb, joint, product) with the empirical joint over that
+    pair and the outer product of its own marginals, both taken from the
+    retained draws with their reconstruction weights.
+    """
+    zone, bl = rep["zone"], rep["zone"].boundary_local
+    codes, w = rep["codes"], rep["weights"]
+    if len(bl) < 2 or len(codes) == 0:
+        return None
+    best = None
+    for a in range(len(bl)):
+        for b in range(a + 1, len(bl)):
+            ka, kb = bl[a], bl[b]
+            j = np.zeros((len(zone.cand[ka]), len(zone.cand[kb])))
+            for row, wt in zip(codes, w):
+                j[row[ka], row[kb]] += wt
+            if j.sum() <= 0:
+                continue
+            j = j / j.sum()
+            prod = np.outer(j.sum(axis=1), j.sum(axis=0))
+            tv = 0.5 * float(np.abs(j - prod).sum())
+            if best is None or tv > best[0]:
+                best = (tv, ka, kb, j, prod)
+    return best
+
+
+def panel_boundary(ax, item, inst, reports, committed, zcol, first):
+    """(c) what a joint report carries that a marginal exchange would not.
+
+    The paper's boundary message is a list of retained *joint* draws, and it
+    says explicitly that the product of single-UE marginals is only a
+    one-pass consensus estimate: correlations among several boundary UEs live
+    in the joint list, not in the product.  This panel puts the two side by
+    side for the most dependent pair of boundary UEs in a zone -- the gap is
+    exactly the information a marginal or scalar exchange discards.
+    """
+    ri, (tv, ka, kb, joint, prod) = item
+    rep = reports[ri]
+    zone = rep["zone"]
+    ua, ub = zone.ue[ka], zone.ue[kb]
+    na, nb = joint.shape
+
+    combos = [(x, y) for x in range(na) for y in range(nb)]
+    xs = np.arange(len(combos))
+    jv = np.array([joint[x, y] for x, y in combos])
+    pv = np.array([prod[x, y] for x, y in combos])
+
+    # a combination absent from F_z is not rare, it is impossible: the two UEs
+    # would break an owned RB or AP limit.  The joint report knows; the product
+    # of marginals does not, and still assigns it mass.
+    rows = rep["rows"]
+    infeasible = np.array([
+        not ((rows[:, ka] == x) & (rows[:, kb] == y)).any() for x, y in combos])
+
+    ax.bar(xs - 0.19, jv, width=0.36, color=zcol.get(zone.idx, "#888"),
+           alpha=0.95, label="retained joint")
+    ax.bar(xs[~infeasible] + 0.19, pv[~infeasible], width=0.36, facecolor="none",
+           edgecolor="#333333", hatch="////", lw=0.7,
+           label="product of marginals")
+    if infeasible.any():
+        ax.bar(xs[infeasible] + 0.19, pv[infeasible], width=0.36,
+               facecolor="none", edgecolor="#c1440e", hatch="////", lw=1.0,
+               label="product mass on\ninfeasible states")
+
+    # where decimation actually landed
+    if ua in committed and ub in committed:
+        hit = combos.index((committed[ua], committed[ub]))
+        ax.axvspan(hit - 0.47, hit + 0.47, color="#c1440e", alpha=0.13, lw=0,
+                   zorder=0)
+
+    ax.set_title(f"zone Z{zone.idx}, boundary UEs {ua} & {ub}\n"
+                 f"TV(joint, product) = {tv:.2f}", fontsize=7.5)
     ax.set_xticks(xs)
-    ax.set_xticklabels([f"RB{int(v)}" for v in inst.cand[i]], fontsize=6.5)
-    ax.set_xlabel("candidate", fontsize=7)
+    ax.set_xticklabels([f"RB{int(zone.cand[ka][x])}\nRB{int(zone.cand[kb][y])}"
+                        for x, y in combos], fontsize=5.6)
+    ax.set_xlabel("joint choice of the two UEs", fontsize=7)
     if first:
-        ax.set_ylabel("marginal / belief", fontsize=8)
-    handles, labels = ax.get_legend_handles_labels()
+        ax.set_ylabel("probability", fontsize=8)
+    handles, _ = ax.get_legend_handles_labels()
     handles.append(Patch(facecolor="#c1440e", alpha=0.28, label="committed"))
-    ax.legend(handles=handles, fontsize=5.8, framealpha=0.9, ncol=1,
-              loc="upper left")
+    ax.legend(handles=handles, fontsize=5.8, framealpha=0.9, loc="upper right")
     ax.tick_params(labelsize=6.5)
 
 
@@ -272,11 +326,13 @@ def main():
     for j, r in enumerate([active[i] for i in order[:N_ZONE_PANELS]]):
         panel_zone_law(fig.add_subplot(gs[0, 1 + j]), r, zcol, j == 0)
 
-    contested = sorted([t for t in res["trace"] if len(holders[t["ue"]]) > 1],
-                       key=lambda t: t["conf"])[:N_BND_PANELS]
-    for j, t in enumerate(contested):
-        panel_boundary(fig.add_subplot(gs[1, 1 + j]), t, inst, reports, holders,
-                       zcol, j == 0)
+    pairs = [(ri, best) for ri, rep in enumerate(reports)
+             if (best := strongest_pair(rep)) is not None]
+    pairs.sort(key=lambda it: -it[1][0])
+    pairs = pairs[:N_BND_PANELS]
+    for j, item in enumerate(pairs):
+        panel_boundary(fig.add_subplot(gs[1, 1 + j]), item, inst, reports,
+                       res["committed"], zcol, j == 0)
     panel_order(fig.add_subplot(gs[1, 4]), res)
 
     fig.suptitle("A region partitioned to the hardware budget, solved by "
@@ -313,10 +369,12 @@ def main():
     for j, r in enumerate([active[i] for i in order[:N_ZONE_PANELS]]):
         specs.append((f"snapshot_b{j+1}_zone_law_Z{r['zone'].idx}", (4.2, 3.2),
                       lambda ax, r=r: panel_zone_law(ax, r, zcol, True)))
-    for j, t in enumerate(contested):
-        specs.append((f"snapshot_c{j+1}_boundary_UE{t['ue']}", (3.6, 3.2),
-                      lambda ax, t=t: panel_boundary(ax, t, inst, reports,
-                                                     holders, zcol, True)))
+    for j, item in enumerate(pairs):
+        zi = reports[item[0]]["zone"]
+        ua, ub = zi.ue[item[1][1]], zi.ue[item[1][2]]
+        specs.append((f"snapshot_c{j+1}_joint_Z{zi.idx}_UE{ua}_{ub}", (4.0, 3.2),
+                      lambda ax, item=item: panel_boundary(
+                          ax, item, inst, reports, res["committed"], zcol, True)))
     specs.append(("snapshot_d_decimation_order", (4.2, 3.2),
                   lambda ax: panel_order(ax, res)))
 

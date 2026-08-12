@@ -22,9 +22,9 @@ Panels:
 | `panels/snapshot_b2_zone_law_Z5.*` | (b2) zone Z5 accepted law |
 | `panels/snapshot_b3_zone_law_Z11.*` | (b3) zone Z11 accepted law |
 | `panels/snapshot_b4_zone_law_Z8.*` | (b4) zone Z8 accepted law |
-| `panels/snapshot_c1_boundary_UE29.*` | (c1) boundary UE 29 |
-| `panels/snapshot_c2_boundary_UE25.*` | (c2) boundary UE 25 |
-| `panels/snapshot_c3_boundary_UE16.*` | (c3) boundary UE 16 |
+| `panels/snapshot_c1_joint_Z11_UE1_26.*` | (c1) joint vs. marginals, zone Z11 |
+| `panels/snapshot_c2_joint_Z9_UE45_49.*` | (c2) joint vs. marginals, zone Z9 |
+| `panels/snapshot_c3_joint_Z12_UE7_33.*` | (c3) joint vs. marginals, zone Z12 |
 | `panels/snapshot_d_decimation_order.*` | (d) order the boundary UEs were fixed |
 | `panels/scaling_a_circuit_cost.*` | (a) two-qubit gate count vs. zones |
 | `panels/scaling_b_utility_ratio.*` | (b) utility ratio vs. zones |
@@ -201,20 +201,36 @@ circuit's law. Departures are finite-sample noise at $K_z=200$, larger where
 $\widetilde K_z$ is smaller; `haiq_certify.py` checks the same statement exactly against a
 Qiskit statevector (max TVD $2.7\times10^{-15}$, zero spurious states).
 
-### (c1)–(c3) boundary coordination
+### (c1)–(c3) what the joint report carries that marginals do not
 
-The three boundary UEs with the *lowest* confidence, i.e. the hardest calls.
+The three zones whose boundary UEs are most strongly coupled, each shown for
+its most dependent pair.
 
-- **x**: that UE's candidate RBs, labelled by RB index.
+- **x**: the four joint choices the two UEs can make, labelled by RB.
 - **y**: probability.
-- **coloured bars**: $\pi_{z,i}$, one per owning zone, in that zone's colour.
-- **black bar**: the consensus belief $b_i\propto\prod_z\pi_{z,i}$.
-- **orange band**: the value decimation committed.
-- **title**: UE index, the two owning zones, and the confidence.
+- **solid bars**: the zone's retained joint report, restricted to that pair.
+- **hatched bars**: the outer product of the zone's own marginals for the same
+  pair — what a marginal or scalar-preference exchange would reconstruct.
+- **red hatched bars**: the same product mass, on combinations that are absent
+  from $\mathcal{F}_z$ entirely. Those are not rare, they are impossible: the
+  two UEs would break an owned RB or AP limit.
+- **shaded column**: where decimation actually committed.
+- **title**: the zone, the pair, and the total-variation distance between the
+  joint and the product.
 
-Where the two coloured bars disagree, the panel shows two zones pulling in
-opposite directions and the product resolving it. A scalar-preference exchange
-would transmit one number per UE and could not express this.
+This is the panel that justifies sending a distribution-valued report rather
+than a preference. Sec. IV-C states that the product of single-UE marginals is
+only a one-pass consensus estimate and that the correlations among several
+boundary UEs live in the joint list; the panels measure that gap at
+TV = 0.33–0.37, and show the sharper version of it: in every panel there is a
+configuration the joint gives exactly zero probability while the product gives
+it 16–19 %. A protocol that exchanged marginals would spend a sixth of its
+belief on assignments that cannot exist.
+
+Across the whole snapshot instance the same comparison over each zone's full
+boundary block gives TV = 0.56, 0.43, 0.42, 0.30 in the four zones where the
+owned limits couple boundary UEs, and exactly 0 in the nine zones where they
+do not — the correlation appears precisely where the constraints bind.
 
 ### (d) the order decimation fixed the boundary UEs
 
