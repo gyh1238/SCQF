@@ -129,6 +129,7 @@ def _run_once(inst, part, beta, ubar, k_accept, k_min, shot_budget, rng,
 
     committed = {}
     exceptions = 0
+    exc_by_zone = [0] * len(reports)   # a re-sampled zone re-sends its report
     backtracks = 0
     trace = []
 
@@ -277,6 +278,7 @@ def _run_once(inst, part, beta, ubar, k_accept, k_min, shot_budget, rng,
                         base_u[ri] = new_u
                         base_w[ri] = _weights(new_u, lam - lam_z, max(len(new_u), 1))
                         exceptions += 1
+                        exc_by_zone[ri] += 1
         else:
             # this variable is exhausted: withdraw it and re-try the previous
             committed.pop(i, None)
@@ -310,6 +312,7 @@ def _run_once(inst, part, beta, ubar, k_accept, k_min, shot_budget, rng,
             cand_rows, cand_u, _, _ = sample_zone(zone, lam_z, rep["k_eff"],
                                                   rng, pinned=zone_pins(ri))
             final_resamples += 1
+            exc_by_zone[ri] += 1
         if len(cand_rows) == 0:
             continue
         pick = cand_rows[int(np.argmax(cand_u))]
@@ -338,12 +341,14 @@ def _run_once(inst, part, beta, ubar, k_accept, k_min, shot_budget, rng,
         ok_global = False
 
     # ---------------- protocol resources ---------------------------------
+    # One report per zone, plus one more each time a zone was re-sampled: a
+    # re-drawn list has to reach the merge point to be of any use.
     bits = 0
-    for rep in reports:
+    for ri, rep in enumerate(reports):
         zone = rep["zone"]
         w = sum(max(1, int(np.ceil(np.log2(len(zone.cand[k])))))
                 for k in zone.boundary_local)
-        bits += rep["k_eff"] * (w + 32)      # codes + one utility scalar per draw
+        bits += (1 + exc_by_zone[ri]) * rep["k_eff"] * (w + 32)
 
     out = dict(utility=util_total, feasible=ok_global, assign=assign,
                n_boundary=len(bnd), exceptions=exceptions,

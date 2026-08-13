@@ -306,12 +306,19 @@ mass is smaller, so the gap shown understates the real one.
 
 ### (b) coordination cost
 
-- **y**: the classical report volume for one coordination round, log scale.
-  A report is $K_z$ boundary code words plus one utility scalar per retained
-  draw.
-- **red squares, dashed**: the whole region. **×8.6** for **×8.4** zones — it
+- **y**: the classical traffic the coordination stage needs, log scale.
+
+A zone's report is its $K_z$ retained draws restricted to its boundary UEs:
+$\sum_{i\in\mathcal{B}_z}\lceil\log_2ert\mathcal{V}_iertceil$ bits
+of code words per draw, plus the one recorded utility $J_z$ that lets the merge
+point reweight it. Every zone sends one, and a zone re-sampled after a
+commitment sends its new list as well, so the count here is
+$(1+	ext{re-samples}_z)\,K_z(\sum\ell_i + 32)$ bits summed over zones. This is
+the whole of the inter-zone communication: the local stage exchanges nothing.
+
+- **red squares, dashed**: the whole region. **×8.8** for **×8.4** zones — it
   tracks the zone count, not something worse.
-- **green circles, solid**: what a single zone sends. **×1.01**, i.e. a zone's
+- **green circles, solid**: what a single zone sends. **×1.05**, i.e. a zone's
   message does not notice how large the region became.
 
 This is the panel that answers the obvious objection to (a): bounding the
@@ -325,7 +332,9 @@ report grows only with the overlap — and this is that statement measured.
 - **y**: utility of the distributed result as a percentage of the centralized
   strict optimum, computed exactly by MILP (HiGHS) on the same instance.
 - **grey line at 100 %**: the optimum.
-- **blue triangles with band**: mean ± 1σ over seeds, 98.8 – 99.9 %.
+- **blue triangles**: mean over seeds; the band is the observed range across
+  them. A ratio cannot exceed 100 by construction, so a symmetric ±1σ band
+  would have reached past the bound — the range cannot.
 
 The centralized optimum appears only as the denominator; it is not a competing
 protocol. Flat here means decomposition, the shot budget and boundary

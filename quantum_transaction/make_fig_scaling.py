@@ -172,7 +172,10 @@ def panel_quality(ax, x, ratio, rlo, rhi, n_ues, standalone=False):
     ax.fill_between(x, rlo, rhi, color=_tint(COL["ratio"], 0.22), lw=0)
     ax.plot(x, ratio, "^-", color=COL["ratio"], ms=6, lw=2.0,
             label="distributed utility / centralized strict optimum")
-    ax.set_ylim(95, 101)
+    ax.text(x[-1], 100.08, "100 % = centralized optimum", ha="right",
+            va="bottom", fontsize=7, color="#777777")
+    ax.set_ylim(96, 100.35)
+    ax.set_yticks([96, 97, 98, 99, 100])
     ax.set_ylabel("utility vs.\ncentralized optimum  [%]", fontsize=9.5)
     ax.legend(loc="lower left", fontsize=8, framealpha=0.95)
     ax.grid(alpha=0.25, lw=0.5)
@@ -189,17 +192,20 @@ def plot(arr, skipped):
                 beta_min=17)
     gs = np.unique(arr[:, cols["g"]])
 
-    def agg(key):
+    def agg(key, band="sd"):
+        """Mean per size, with a band.  `band="range"` spans the observed
+        seeds instead of mean +/- sd, which is what a quantity bounded above
+        by 100 needs: a symmetric band would reach past the bound."""
         m, lo, hi, x = [], [], [], []
         for g in gs:
             v = arr[arr[:, cols["g"]] == g, cols[key]]
             m.append(v.mean())
-            lo.append(v.mean() - v.std())
-            hi.append(v.mean() + v.std())
+            lo.append(v.min() if band == "range" else v.mean() - v.std())
+            hi.append(v.max() if band == "range" else v.mean() + v.std())
             x.append(arr[arr[:, cols["g"]] == g, cols["zones"]].mean())
         return np.array(x), np.array(m), np.array(lo), np.array(hi)
 
-    x, ratio, rlo, rhi = agg("ratio")
+    x, ratio, rlo, rhi = agg("ratio", band="range")
     _, z2q, z2lo, z2hi = agg("zone2q")
     _, c2q, _, _ = agg("cen2q")
 
@@ -218,9 +224,10 @@ def plot(arr, skipped):
 
     feas = arr[:, cols["feas"]].mean() * 100
     fig.text(0.013, 0.055,
-             f"{len(arr)} instances, {len(SEEDS)} seeds per size; shading is one "
-             f"standard deviation. beta={BETA}, K_z={K_ACCEPT}"
-             + (f"; {skipped} globally infeasible instances excluded." if skipped
+             f"{len(arr)} instances, {len(SEEDS)} seeds per size. Band: one "
+             f"standard deviation in (a), the observed range in (c). "
+             f"beta={BETA}, K_z={K_ACCEPT}"
+             + (f"; {skipped} infeasible instances excluded." if skipped
                 else "."),
              fontsize=7, color="#555555")
     fig.text(0.013, 0.022,
