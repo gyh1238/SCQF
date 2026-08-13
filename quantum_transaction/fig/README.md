@@ -292,9 +292,10 @@ fixed density, and panel (c) labels both tick rows: 5 zones / 18 UEs up to 45
 zones / 162 UEs, a nine-fold growth. Zones are the axis quantity because the
 per-zone claims in (a) and (b) are indexed by them.
 
-### (a) circuit cost
+### (a) circuit complexity
 
-- **y**: two-qubit gates for one oracle pass, log scale.
+- **y**: two-qubit gates for one oracle pass, log scale. The axis names the
+  quantity and the metric on two lines, as (b) and (c) do.
 - **red squares, dashed**: the centralized circuit — one circuit for the whole
   region. **×16** across the range.
 - **green circles, solid**: the largest zone circuit, $\max_z$, with a ±1σ
@@ -306,7 +307,7 @@ includes amplification, which the figures do not use; if it were added, the
 centralized circuit would need *more* rounds than a zone because its accepted
 mass is smaller, so the gap shown understates the real one.
 
-### (b) coordination cost
+### (b) communication volume
 
 - **y**: the classical traffic the coordination stage needs, log scale.
 
@@ -330,7 +331,7 @@ instead. It does not. Sec. V-D argues this in prose — that under bounded zone
 density the largest $Q_z$ is independent of the number of zones while the
 report grows only with the overlap — and this is that statement measured.
 
-### (c) utility ratio
+### (c) solution accuracy
 
 - **y**: utility of the distributed result as a percentage of the centralized
   strict optimum, computed exactly by MILP (HiGHS) on the same instance.
@@ -345,6 +346,18 @@ The centralized optimum appears only as the denominator; it is not a competing
 protocol. Flat here means decomposition, the shot budget and boundary
 coordination together cost about a point of utility, and that this does not
 worsen as the region grows.
+
+**Why the band is widest at 9 zones.** The loss is not a continuous quantity:
+it is a small count of events, each one a UE pushed to a worse RB, and each
+worth $100/ert\mathcal{U}ert$ percentage points. Measured in those units
+the spread is about **one such event at every size** — 0.89, 1.08, 1.22, 1.31,
+0.94, 1.23 from 9 zones upwards — so what shrinks along the axis is not the
+error but the percentage one error is worth: 3.1 points at 32 UEs against 0.6
+at 162. The smallest size is narrow for the opposite reason: at 18 UEs the
+instance is easy enough that four of six seeds find the optimum exactly, so
+the point sits at a ceiling rather than in the middle of a spread. The dip
+from the first size to the second is that ceiling ending, not the method
+degrading.
 
 Read together: the work one processor does and the traffic one zone sends are
 both unchanged across a nine-fold growth in problem size, while the

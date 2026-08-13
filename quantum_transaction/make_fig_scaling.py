@@ -116,6 +116,16 @@ def _tint(color, frac):
     return (1 - frac + frac * r, 1 - frac + frac * g, 1 - frac + frac * b)
 
 
+def _ylabel(ax, concept, metric):
+    """Name the quantity, then say how it is measured.
+
+    An axis reading "two-qubit gates" makes the reader work out which of the
+    three claims the panel is carrying; one reading "circuit complexity" hides
+    what was counted.  Both lines together cost nothing and answer both.
+    """
+    ax.set_ylabel(f"{concept}\n{metric}", fontsize=9.5, linespacing=1.6)
+
+
 def panel_cost(ax, x, z2q, z2lo, z2hi, c2q, title=False, standalone=False):
     """(a) two-qubit gates of one oracle pass: centralized against per zone."""
     ax.set_yscale("log")
@@ -135,7 +145,7 @@ def panel_cost(ax, x, z2q, z2lo, z2hi, c2q, title=False, standalone=False):
     ax.annotate(f"×{z2q[-1]/z2q[0]:.2f}", (x[-1], z2q[-1]),
                 textcoords="offset points", xytext=(-6, -13), ha="right",
                 fontsize=7.5, color=COL["zone"])
-    ax.set_ylabel("two-qubit gates\n(one oracle pass)", fontsize=9.5)
+    _ylabel(ax, "circuit complexity", "two-qubit gates, one oracle pass")
     ax.set_ylim(min(z2q) / 3, max(c2q) * 6)
     ax.legend(loc="upper left", fontsize=8, framealpha=0.95)
     ax.grid(alpha=0.25, which="both", lw=0.5)
@@ -158,7 +168,7 @@ def panel_comm(ax, x, tot_kb, per_kb, standalone=False):
     ax.annotate(f"×{per_kb[-1]/per_kb[0]:.2f}", (x[-1], per_kb[-1]),
                 textcoords="offset points", xytext=(-6, -13), ha="right",
                 fontsize=7.5, color=COL["zone"])
-    ax.set_ylabel("classical report\n[kB]", fontsize=9.5)
+    _ylabel(ax, "communication volume", "classical report [kB]")
     ax.set_ylim(min(per_kb) / 3, max(tot_kb) * 6)
     ax.legend(loc="upper left", fontsize=8, framealpha=0.95)
     ax.grid(alpha=0.25, which="both", lw=0.5)
@@ -176,7 +186,7 @@ def panel_quality(ax, x, ratio, rlo, rhi, n_ues, standalone=False):
             va="top", fontsize=7, color="#777777")
     ax.set_ylim(90, 100.4)
     ax.set_yticks([90, 92, 94, 96, 98, 100])
-    ax.set_ylabel("utility vs.\ncentralized optimum  [%]", fontsize=9.5)
+    _ylabel(ax, "solution accuracy", "utility vs. centralized optimum [%]")
     ax.legend(loc="lower left", fontsize=8, framealpha=0.95)
     ax.grid(alpha=0.25, lw=0.5)
     ax.set_xticks(x)
