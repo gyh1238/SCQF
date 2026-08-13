@@ -172,17 +172,23 @@ def panel_quality(ax, x, ratio, rlo, rhi, n_ues, standalone=False):
     ax.fill_between(x, rlo, rhi, color=_tint(COL["ratio"], 0.22), lw=0)
     ax.plot(x, ratio, "^-", color=COL["ratio"], ms=6, lw=2.0,
             label="distributed utility / centralized strict optimum")
-    ax.text(x[-1], 100.08, "100 % = centralized optimum", ha="right",
-            va="bottom", fontsize=7, color="#777777")
-    ax.set_ylim(96, 100.35)
-    ax.set_yticks([96, 97, 98, 99, 100])
+    ax.text(x[-1], 99.75, "100 % = centralized optimum", ha="right",
+            va="top", fontsize=7, color="#777777")
+    ax.set_ylim(90, 100.4)
+    ax.set_yticks([90, 92, 94, 96, 98, 100])
     ax.set_ylabel("utility vs.\ncentralized optimum  [%]", fontsize=9.5)
     ax.legend(loc="lower left", fontsize=8, framealpha=0.95)
     ax.grid(alpha=0.25, lw=0.5)
     ax.set_xticks(x)
     ax.set_xticklabels([f"{xi:.0f}\n{nu:.0f}" for xi, nu in zip(x, n_ues)],
                        fontsize=8.5)
-    ax.set_xlabel("zones after partitioning  /  UEs in the region", fontsize=10)
+    # two bare rows of numbers do not say which row is which
+    ax.annotate("zones", (-0.015, -0.030), xycoords="axes fraction",
+                ha="right", va="top", fontsize=8.5, color="#555555")
+    ax.annotate("UEs", (-0.015, -0.098), xycoords="axes fraction",
+                ha="right", va="top", fontsize=8.5, color="#555555")
+    ax.set_xlabel("region size, in zones produced and UEs covered",
+                  fontsize=10, labelpad=6)
 
 
 def plot(arr, skipped):
@@ -218,23 +224,14 @@ def plot(arr, skipped):
     fig, (ax_c, ax_m, ax_q) = plt.subplots(
         3, 1, figsize=(6.9, 8.0), sharex=True,
         gridspec_kw=dict(height_ratios=[1.15, 1.15, 1]))
-    panel_cost(ax_c, x, z2q, z2lo, z2hi, c2q, title=True)
+    panel_cost(ax_c, x, z2q, z2lo, z2hi, c2q)
     panel_comm(ax_m, x, tot_kb, per_kb)
     panel_quality(ax_q, x, ratio, rlo, rhi, n_ues)
 
-    feas = arr[:, cols["feas"]].mean() * 100
-    fig.text(0.013, 0.055,
-             f"{len(arr)} instances, {len(SEEDS)} seeds per size. Band: one "
-             f"standard deviation in (a), the observed range in (c). "
-             f"beta={BETA}, K_z={K_ACCEPT}"
-             + (f"; {skipped} infeasible instances excluded." if skipped
-                else "."),
-             fontsize=7, color="#555555")
-    fig.text(0.013, 0.022,
-             f"Every accepted assignment satisfies the original constraints; "
-             f"{feas:.0f}% of runs closed on a strictly feasible global assignment.",
-             fontsize=7, color="#555555")
-    fig.subplots_adjust(left=0.135, right=0.98, top=0.945, bottom=0.135,
+    # No title and no caption block: both belong to the document that places
+    # the figure, and the numbers are printed to stdout and kept in
+    # fig/README.md.
+    fig.subplots_adjust(left=0.145, right=0.98, top=0.985, bottom=0.115,
                         hspace=0.14)
     os.makedirs("fig", exist_ok=True)
     _save(fig, "fig/fig_scaling", formats=("pdf", "png"), dpi=200)

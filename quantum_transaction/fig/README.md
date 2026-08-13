@@ -286,9 +286,11 @@ the run needed.
 Each marker is the mean over the seeds at one size; shading is one standard
 deviation. All three panels share the growth axis.
 
-**x (all panels)**: the number of zones the partitioner produced, averaged over
-seeds. The lower tick row on panel (c) gives the corresponding UE count, so the
-axis reads in both units: 5 zones / 18 UEs up to 45 zones / 162 UEs.
+**x (all panels)**: region size. The independent variable is the side of the
+region; the zone count and the UE count are both consequences of growing it at
+fixed density, and panel (c) labels both tick rows: 5 zones / 18 UEs up to 45
+zones / 162 UEs, a nine-fold growth. Zones are the axis quantity because the
+per-zone claims in (a) and (b) are indexed by them.
 
 ### (a) circuit cost
 
@@ -309,7 +311,8 @@ mass is smaller, so the gap shown understates the real one.
 - **y**: the classical traffic the coordination stage needs, log scale.
 
 A zone's report is its $K_z$ retained draws restricted to its boundary UEs:
-$\sum_{i\in\mathcal{B}_z}\lceil\log_2ert\mathcal{V}_iertceil$ bits
+$\sum_{i\in\mathcal{B}_z}\lceil\log_2ert\mathcal{V}_iert
+ceil$ bits
 of code words per draw, plus the one recorded utility $J_z$ that lets the merge
 point reweight it. Every zone sends one, and a zone re-sampled after a
 commitment sends its new list as well, so the count here is
@@ -331,7 +334,9 @@ report grows only with the overlap — and this is that statement measured.
 
 - **y**: utility of the distributed result as a percentage of the centralized
   strict optimum, computed exactly by MILP (HiGHS) on the same instance.
-- **grey line at 100 %**: the optimum.
+- **grey line at 100 %**: the optimum. The axis runs down to 90 so that the
+  distance to it is visible rather than magnified: the curve sits in the top
+  tenth of the panel throughout.
 - **blue triangles**: mean over seeds; the band is the observed range across
   them. A ratio cannot exceed 100 by construction, so a symmetric ±1σ band
   would have reached past the bound — the range cannot.
