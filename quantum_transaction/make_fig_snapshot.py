@@ -78,15 +78,6 @@ def _tint(color, frac):
     return (1 - frac + frac * r, 1 - frac + frac * g, 1 - frac + frac * b)
 
 
-def _count(n):
-    """Compact shot count: 7.6e4 reads worse than 76k on a small panel."""
-    if n >= 1e6:
-        return f"{n/1e6:.1f}M"
-    if n >= 1e3:
-        return f"{n/1e3:.0f}k"
-    return f"{n:.0f}"
-
-
 def _save(fig, stem, formats=("pdf", "svg", "png"), **kw):
     """Every output is written on a transparent background."""
     for ext in formats:

@@ -39,14 +39,26 @@ script clears its own panels before writing so stale names cannot linger.
 Regenerate everything with:
 
 ```bash
-python make_fig_scaling.py     # add --recollect to redo the sweep
+python make_fig_scaling.py               # --recollect to redo the sweep
 python make_fig_snapshot.py
+python preview_seeds.py 12               # only to re-choose the region
 ```
 
-Both scripts write the composite and the panels in one run. Panels are drawn
-by the same functions as the composite (`panel_map`, `panel_zone_law`,
-`panel_boundary`, `panel_order`, `panel_cost`, `panel_quality`), so editing a
-panel function changes both.
+Both figure scripts write the composite and the panels in one run. Panels are
+drawn by the same functions as the composite — `panel_map`, `panel_zone_law`,
+`panel_boundary`, `panel_ablation`, `panel_order` for the snapshot,
+`panel_cost`, `panel_comm`, `panel_quality` for the scaling figure — so
+editing a panel function changes both.
+
+Two caches hold the sweeps, since both take minutes to recompute:
+
+| cache | holds | force a recompute |
+|---|---|---|
+| `../scaling_data.npz` | the 40-instance growth sweep behind `fig_scaling` | `--recollect` |
+| `../ablation_data.npz` | the 16-instance joint-vs-marginal comparison behind (c3) | delete the file |
+
+How many panels each row shows is set by `N_ZONE_PANELS` (4) and
+`N_BND_PANELS` (2) in `make_fig_snapshot.py`; the grid widths follow.
 
 ## 2. Symbols
 
@@ -220,8 +232,18 @@ Qiskit statevector (max TVD $2.7\times10^{-15}$, zero spurious states).
 The row answers one question — why a zone sends a list of retained *joint*
 draws instead of one marginal per boundary UE — in two steps.
 
-**(c1), (c2): what marginals lose.** The two zones whose boundary UEs are most
-strongly coupled, each for its most dependent pair.
+**(c1), (c2): what marginals lose.** Zones and pairs are chosen by measurement,
+not by eye. For every zone, `strongest_pair` takes each pair of its boundary
+UEs, forms the empirical joint over that pair and the outer product of the two
+marginals, and scores the pair by the total-variation distance between them;
+the zone keeps its worst pair, and the row shows the two worst zones. In the
+displayed instance that ranking runs TV = 0.40 (Z10), 0.39 (Z9), 0.37 (Z0),
+0.33, 0.26 … down to exactly 0.00 in the zones whose owned limits do not
+couple their boundary UEs — the dependence appears precisely where the
+constraints bind, which is why the panels are worth showing at all.
+
+The TV value is not printed on the panel: it selects what to show, and the
+red bar then says the same thing in a form that needs no scale.
 
 - **x**: the four joint choices the two UEs can make, labelled by RB and
   ordered by the joint report, largest first. The impossible combination
@@ -235,11 +257,16 @@ strongly coupled, each for its most dependent pair.
   none of the joint's, which is why it stands alone with no solid bar beside
   it.
 
-**(c3): what losing them costs.** One point per instance. The horizontal axis
+**(c3): what losing them costs.** 16 instances — region sizes `g` = 4, 5, 6, 7
+crossed with seeds 0–3, set by `ABLATION_G` and `ABLATION_SEEDS`. This is a
+smaller sweep than the one behind `fig_scaling`, because each point costs two
+full protocol runs; it is not the same set, and the panel makes no claim about
+how the gap varies with size. One point per instance. The horizontal axis
 is the utility reached when each zone's marginals are taken once and not
 revisited; the vertical axis is the utility reached when the retained joint
-list is re-conditioned after every commitment. Points above the diagonal are
-instances where keeping the joint list helped. Everything else is held fixed
+list is re-conditioned after every commitment. Points above the grey diagonal, labelled *equal*, are instances where keeping
+the joint list helped; the corner note gives the mean gap and how many of the
+16 improved. Everything else is held fixed
 between the two runs — sampler, feasibility guard, commitment order — so the
 gap is attributable to the report format alone.
 
@@ -325,6 +352,13 @@ the whole of the inter-zone communication: the local stage exchanges nothing.
 - **green circles, solid**: what a single zone sends. **×1.05**, i.e. a zone's
   message does not notice how large the region became.
 
+Note the asymmetry with (a): the green curve there is the **largest** zone,
+$\max_z$, while the green curve here is the **mean** zone, total ÷ zones. That
+is deliberate — a circuit has to fit on a device, so the worst zone is what
+decides feasibility, whereas traffic is carried by a network and what matters
+is the load it sees. But it does mean this panel does not bound the largest
+single report, only the typical one.
+
 This is the panel that answers the obvious objection to (a): bounding the
 per-zone circuit is not interesting if the coordination it requires explodes
 instead. It does not. Sec. V-D argues this in prose — that under bounded zone
@@ -367,9 +401,24 @@ centralized circuit and the total traffic grow with it, at no cost in quality.
 
 - Panels are vector. Text in the `.svg` files stays as text, so it can be
   restyled or translated without re-running anything.
-- Colours: zones use `tab20`. The fixed roles are utility ratio `#1f6fb4`,
-  zone cost `#2e8b57`, centralized cost `#c1440e`, hardware ceilings `#8a8a8a`.
-  Boundary UEs and committed values reuse `#c1440e`.
+- Colours: zones use `tab20`. The fixed roles are distributed/per-zone
+  `#2e8b57`, centralized/whole-region `#c1440e`, utility ratio `#1f6fb4`.
+  Boundary UEs, their AP links and the impossible bar reuse `#c1440e`, so the
+  same red always means "this is the thing that costs you".
+- **Fills are pre-blended, not transparent.** Every large tinted area — zone
+  territories, the infeasible band, the confidence bands — is drawn opaque at
+  a colour already mixed toward white by `_tint`. Reducing an alpha in the SVG
+  will therefore do nothing; change the blend fraction instead. This exists
+  because a partially transparent fill on a transparent background renders at
+  full saturation in any viewer that flattens or ignores the alpha channel,
+  which made the PNGs disagree with the PDFs.
+- Type sizes come from four constants at the top of `make_fig_snapshot.py` —
+  `FS_TITLE` 8, `FS_LABEL` 7.5, `FS_TICK` 6.5, `FS_LEGEND` 6.2 — so panels
+  cannot drift apart. The scaling figure sets its sizes inline, being three
+  panels rather than eleven.
+- Neither composite carries a title or a caption block: both belong to the
+  document that places the figure. The numbers that would go in a caption are
+  printed to stdout when the script runs.
 - Transparent background means anything relying on white behind the text will
   need a background added at placement time. All text is dark, so a light
   backdrop is assumed.

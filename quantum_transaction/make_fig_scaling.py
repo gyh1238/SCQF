@@ -92,7 +92,7 @@ def load():
     return z["data"], int(z["skipped"])
 
 
-COL = dict(ratio="#1f6fb4", zone="#2e8b57", cen="#c1440e", ceil="#8a8a8a")
+COL = dict(ratio="#1f6fb4", zone="#2e8b57", cen="#c1440e")
 
 PANEL_DIR = "fig/panels"
 
@@ -126,7 +126,7 @@ def _ylabel(ax, concept, metric):
     ax.set_ylabel(f"{concept}\n{metric}", fontsize=9.5, linespacing=1.6)
 
 
-def panel_cost(ax, x, z2q, z2lo, z2hi, c2q, title=False, standalone=False):
+def panel_cost(ax, x, z2q, z2lo, z2hi, c2q, standalone=False):
     """(a) two-qubit gates of one oracle pass: centralized against per zone."""
     ax.set_yscale("log")
     ax.axhline(BUDGET_DEFAULT, color=COL["zone"], ls="--", lw=1.0,
@@ -149,8 +149,6 @@ def panel_cost(ax, x, z2q, z2lo, z2hi, c2q, title=False, standalone=False):
     ax.set_ylim(min(z2q) / 3, max(c2q) * 6)
     ax.legend(loc="upper left", fontsize=8, framealpha=0.95)
     ax.grid(alpha=0.25, which="both", lw=0.5)
-    if title:
-        ax.set_title("Growing the region adds zones, not zone size", fontsize=11)
     if standalone:
         ax.set_xlabel("zones after partitioning", fontsize=10)
 
