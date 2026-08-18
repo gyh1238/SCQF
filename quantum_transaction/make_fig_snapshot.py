@@ -91,6 +91,17 @@ def _tint(color, frac):
     return (1 - frac + frac * r, 1 - frac + frac * g, 1 - frac + frac * b)
 
 
+def _shade(color, frac):
+    """`color` darkened `frac` of the way to black.
+
+    The counterpart of `_tint`, for the campus panel: a territory drawn as a
+    line instead of a fill has far less area to carry its colour, and the
+    paler half of `tab20` disappears against a map at full value.
+    """
+    r, g, b = to_rgb(color)
+    return ((1 - frac) * r, (1 - frac) * g, (1 - frac) * b)
+
+
 def _save(fig, stem, formats=("pdf", "svg", "png"), **kw):
     """Every output is written on a transparent background."""
     for ext in formats:
@@ -174,7 +185,7 @@ def panel_map(ax, inst, part, active, zcol):
     on_map = inst.geo is not None
     if on_map:
         import haiq_geo
-        img, extent = haiq_geo.basemap(inst.geo, pad=0.60)
+        img, extent = haiq_geo.basemap(inst.geo, pad=0.60, wash=0.22)
         ax.imshow(img, extent=extent, origin="upper", interpolation="bilinear",
                   zorder=-1)
 
@@ -182,11 +193,29 @@ def panel_map(ax, inst, part, active, zcol):
         if not part.zones[z]:
             continue
         m = (terr == z).astype(float)
-        ax.contourf(gx, gy, m, levels=[0.5, 1.5],
-                    colors=[_tint(zcol.get(z, "#cccccc"), 0.30)],
-                    alpha=0.45 if on_map else None, zorder=0)
-        ax.contour(gx, gy, m, levels=[0.5], colors="white", linewidths=1.0,
-                   zorder=1)
+        if on_map:
+            # Outline, not fill: any wash heavy enough to identify a zone is
+            # also heavy enough to bury the ground it sits on, and the ground
+            # is the reason the panel is over a map at all.  The border
+            # carries the zone colour instead, over a white line wide enough
+            # to keep it off the streets underneath.  Every halo goes down
+            # before any colour does -- neighbours share a border, so a halo
+            # drawn later would rub out the line it is meant to back.
+            ax.contour(gx, gy, m, levels=[0.5], colors="white",
+                       linewidths=2.8, zorder=1)
+        else:
+            ax.contourf(gx, gy, m, levels=[0.5, 1.5],
+                        colors=[_tint(zcol.get(z, "#cccccc"), 0.30)], zorder=0)
+            ax.contour(gx, gy, m, levels=[0.5], colors="white", linewidths=1.0,
+                       zorder=1)
+
+    if on_map:
+        for z in range(len(part.zones)):
+            if not part.zones[z]:
+                continue
+            ax.contour(gx, gy, (terr == z).astype(float), levels=[0.5],
+                       colors=[_shade(zcol.get(z, "#999999"), 0.25)],
+                       linewidths=1.3, zorder=1.1)
 
     # boundary UEs are joined to the APs that offer them a candidate RB
     bset = set(part.boundary.tolist())
@@ -244,7 +273,7 @@ def panel_map(ax, inst, part, active, zcol):
         frameon=False, handletextpad=0.4, columnspacing=1.1,
         # two lines, not one: in the composite this panel is narrower than the
         # standalone, and a single line of this ran into the neighbouring axes
-        title=("shading: zone territory (nearest AP)\n"
+        title=("outline: zone territory (nearest AP)\n"
                "basemap: campus; APs on rooftops, UEs on open ground"
                if on_map else "shading: zone territory (nearest AP)"),
         title_fontsize=7.5, alignment="left")

@@ -230,14 +230,18 @@ and prints the numbers behind the choice.
 
 - **axes**: the campus window the instance was cut from. No units; AP grid
   spacing is 1.0, which is 150 px of the rasters. Ticks are suppressed.
-- **basemap**: the campus, blended 30 % to white. It is context, not a model
+- **basemap**: the campus, blended 22 % to white. It is context, not a model
   quantity — but it is the reason the APs sit where they do, since each stands
   on ground `ap_allowed_mask` permits and each UE on ground `ue_allowed_mask`
   permits.
-- **shading**: zone territory — each point takes the colour of the zone owning
-  its *nearest* AP. This is a reading aid for where a zone sits, not a model
-  quantity; zone membership of a UE is set by $\mathcal{V}_i$, not by distance.
-- **white lines**: territory borders.
+- **coloured outlines**: zone territory — the border of the region whose every
+  point has its *nearest* AP in that zone, drawn in the zone's colour over a
+  white line. Territories are outlined rather than filled here: a fill heavy
+  enough to identify a zone also buries the ground under it, which is the one
+  thing the map was put there to show. On the square (`GEO = False`) they are
+  filled instead, there being nothing behind them to hide. Either way this is
+  a reading aid for where a zone sits, not a model quantity; zone membership
+  of a UE is set by $\mathcal{V}_i$, not by distance.
 - **squares**: APs, coloured by zone.
 - **open orange circles**: boundary UEs.
 - **small filled dots**: interior UEs, coloured by their single zone.
@@ -456,10 +460,11 @@ centralized circuit and the total traffic grow with it, at no cost in quality.
   will therefore do nothing; change the blend fraction instead. This exists
   because a partially transparent fill on a transparent background renders at
   full saturation in any viewer that flattens or ignores the alpha channel,
-  which made the PNGs disagree with the PDFs. The one exception is the zone
-  territory in (a) when it is drawn over the campus: there the alpha sits over
-  an opaque basemap, never over the transparent page, so it is a real alpha
-  (0.45) and may be edited as one.
+  which made the PNGs disagree with the PDFs. Over the campus the question
+  does not arise: (a) outlines its territories instead of filling them, so
+  there is no large tinted area in that panel at all. The outline colour is
+  `_shade(zone, 0.25)` — darkened, not tinted, because a line has far less
+  area than a fill to carry a colour with.
 - Type sizes come from four constants at the top of `make_fig_snapshot.py` —
   `FS_TITLE` 8, `FS_LABEL` 7.5, `FS_TICK` 6.5, `FS_LEGEND` 6.2 — so panels
   cannot drift apart. The scaling figure sets its sizes inline, being three
