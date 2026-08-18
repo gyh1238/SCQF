@@ -20,11 +20,22 @@ Panels, each carrying one checkable claim rather than an illustration:
 
  (d) the order decimation fixed the boundary UEs: one point per UE.
 
-The instance comes from the same generator as the scaling figure.  Its seed
-is chosen for legibility -- compact zones, no one-UE zones, boundary links
-that can be followed -- and the caption states where its utility ratio falls
-among the candidate seeds so that a presentation choice cannot pass for a
-quality one.  `preview_seeds.py` renders the candidates side by side.
+The instance comes from the same generator as the scaling figure, but with
+`GEO` set it is cut from a real campus rather than from a bare square: APs
+stand on the rooftops and lots they are allowed to occupy, UEs on open
+ground, and panel (a) is drawn over the map so the shape of a zone can be
+read against the buildings that produced it.  See `haiq_geo.py`.  The
+scaling figure stays on the square, where a flat lattice states the bounded
+density its claim rests on; both are the same protocol on the same
+generator, differing only in where the points are allowed to fall.
+
+Its seed is chosen for legibility -- compact zones, no one-UE zones,
+boundary links that can be followed -- and the caption states where its
+utility ratio falls among the candidate seeds so that a presentation choice
+cannot pass for a quality one.  `preview_seeds.py` renders the candidates
+side by side; on the campus some seeds have no centralized optimum at all
+(UEs bunch onto open ground faster than the APs facing it can admit them)
+and those are skipped by both scripts.
 
 Usage:  python make_fig_snapshot.py
 """
@@ -48,7 +59,7 @@ from haiq_cost import BUDGET_DEFAULT
 PANEL_DIR = "fig/panels"
 
 G = 5
-SEED = 7           # chosen for legibility; see pick_seed and preview_seeds.py
+SEED = 14          # chosen for legibility; see pick_seed and preview_seeds.py
 BETA = 1.5
 K_ACCEPT = 200
 SHOT_BUDGET = 10_000
@@ -57,6 +68,8 @@ FS_LABEL = 7.5
 FS_TICK = 6.5
 FS_LEGEND = 6.2
 COL_RATIO = "#1f6fb4"
+
+GEO = True         # place the region on the campus rasters; see haiq_geo.py
 
 N_ZONE_PANELS = 4
 N_BND_PANELS = 2
@@ -84,8 +97,18 @@ def _save(fig, stem, formats=("pdf", "svg", "png"), **kw):
         fig.savefig(f"{stem}.{ext}", transparent=True, **kw)
 
 
+def build_instance(seed, g=None):
+    """The instance every panel of this figure -- and `preview_seeds` -- uses.
+
+    One place decides whether the region is the bare square or a window of
+    campus, so the preview cannot end up choosing a seed on one geometry
+    while the figure renders another.
+    """
+    return make_instance(g=G if g is None else g, seed=seed, geo=GEO)
+
+
 def run_seed(seed):
-    inst = make_instance(g=G, seed=seed)
+    inst = build_instance(seed)
     opt, _, ok = solve_centralized(inst)
     if not ok:
         return None
@@ -96,7 +119,7 @@ def run_seed(seed):
     return (100.0 * res["utility"] / opt, seed, inst, part, res, opt)
 
 
-def pick_seed(seed=SEED, seeds=range(12)):
+def pick_seed(seed=SEED, seeds=range(16)):
     """Build the chosen instance, and say where its quality sits among its peers.
 
     The seed is chosen for legibility -- compact zones, no degenerate one-UE
@@ -124,8 +147,16 @@ def panel_map(ax, inst, part, active, zcol):
     # The territory shading has to cover the axes exactly, or the frame shows a
     # white band where the grid stops.  Fix the extent first -- square, so that
     # `aspect("equal")` cannot pad one side -- and build the grid on it.
-    lo = np.minimum(inst.ue_xy.min(axis=0), inst.ap_xy.min(axis=0)) - 0.30
-    hi = np.maximum(inst.ue_xy.max(axis=0), inst.ap_xy.max(axis=0)) + 0.30
+    if inst.geo is not None:
+        # On the campus the region is not "wherever the points landed": it is
+        # the window the instance was cut from, so frame that instead.  A UE on
+        # its edge would otherwise widen the view and break the alignment
+        # between the drawn extent and the ground the masks describe.
+        lo = inst.geo.lo - 0.30
+        hi = inst.geo.lo + inst.geo.side + 0.30
+    else:
+        lo = np.minimum(inst.ue_xy.min(axis=0), inst.ap_xy.min(axis=0)) - 0.30
+        hi = np.maximum(inst.ue_xy.max(axis=0), inst.ap_xy.max(axis=0)) + 0.30
     span = float((hi - lo).max())
     mid = 0.5 * (lo + hi)
     lo, hi = mid - span / 2, mid + span / 2
@@ -135,12 +166,25 @@ def panel_map(ax, inst, part, active, zcol):
           + (gy[..., None] - inst.ap_xy[:, 1]) ** 2)
     terr = part.zone_of[np.argmin(d2, axis=2)]           # zone owning each point
 
+    # On the campus the ground under the zones carries the reason they came
+    # out the shape they did, so it is drawn: the buildings the APs sit on and
+    # the open ground the UEs stand on.  Here the fills may be genuinely
+    # semi-transparent -- the caution in `_tint` is about alpha over the
+    # transparent page, and this alpha sits over an opaque basemap.
+    on_map = inst.geo is not None
+    if on_map:
+        import haiq_geo
+        img, extent = haiq_geo.basemap(inst.geo, pad=0.60)
+        ax.imshow(img, extent=extent, origin="upper", interpolation="bilinear",
+                  zorder=-1)
+
     for z in range(len(part.zones)):
         if not part.zones[z]:
             continue
         m = (terr == z).astype(float)
         ax.contourf(gx, gy, m, levels=[0.5, 1.5],
-                    colors=[_tint(zcol.get(z, "#cccccc"), 0.30)], zorder=0)
+                    colors=[_tint(zcol.get(z, "#cccccc"), 0.30)],
+                    alpha=0.45 if on_map else None, zorder=0)
         ax.contour(gx, gy, m, levels=[0.5], colors="white", linewidths=1.0,
                    zorder=1)
 
@@ -198,7 +242,11 @@ def panel_map(ax, inst, part, active, zcol):
                    label="UE-to-candidate-AP link")],
         loc="upper left", bbox_to_anchor=(0.0, -0.015), fontsize=7.5, ncol=2,
         frameon=False, handletextpad=0.4, columnspacing=1.1,
-        title="shading: zone territory (nearest AP)",
+        # two lines, not one: in the composite this panel is narrower than the
+        # standalone, and a single line of this ran into the neighbouring axes
+        title=("shading: zone territory (nearest AP)\n"
+               "basemap: campus; APs on rooftops, UEs on open ground"
+               if on_map else "shading: zone territory (nearest AP)"),
         title_fontsize=7.5, alignment="left")
 
 
@@ -364,7 +412,7 @@ def ablation_data():
     rows = []
     for g in ABLATION_G:
         for sd in ABLATION_SEEDS:
-            inst = make_instance(g=g, seed=sd)
+            inst = build_instance(sd, g=g)
             opt, _, ok = solve_centralized(inst)
             if not ok:
                 continue

@@ -16,6 +16,15 @@ degree fixed while increasing `g` grows the *global* problem without
 changing local density -- this is the growth axis used by the scaling
 figure, and it is exactly the "bounded zone density and bounded candidate
 degree" regime the manuscript invokes in Sec. V-D.
+
+Passing `geo=True` keeps every density above but takes the *positions* from
+a real campus (`haiq_geo`): APs snap to the rooftops and lots they are
+allowed to occupy, UEs are drawn over open ground only.  A `g` x `g` window
+of campus stands in for the `g` x `g` square, so `g` is still a pure size
+knob; what changes is that coverage overlap now follows streets and
+courtyards instead of a lattice.  The snapshot figure uses it, the scaling
+sweep does not -- the scaling claim is about density, and a flat lattice
+states that assumption without borrowing one campus's street plan.
 """
 
 from dataclasses import dataclass
@@ -36,6 +45,7 @@ class Instance:
     w_ap: int                  # AP admission limit (per AP)
     g: int                     # grid side (region size)
     seed: int
+    geo: object = None         # haiq_geo.Window if placed on the campus, else None
 
     # ---- derived sizes ----
     @property
@@ -64,19 +74,33 @@ class Instance:
 
 
 def make_instance(g=5, ue_per_ap=2.0, n_rb_per_ap=4, radius=1.2,
-                  max_deg=2, w_rb=1, w_ap=4, seed=0, jitter=0.18):
+                  max_deg=2, w_rb=1, w_ap=4, seed=0, jitter=0.18, geo=False):
     """
     Build one instance on a g x g perturbed AP grid.
 
     Densities (UEs per AP, RBs per AP, coverage radius, candidate degree)
     are independent of `g`, so `g` is a pure problem-size knob.
+
+    With `geo=True` the same densities are laid on a g x g window of the
+    campus rasters instead of on the bare square: APs snap to allowed
+    ground, UEs are drawn over allowed ground.  A cell with nowhere legal to
+    mount yields no AP, so `n_ap` may fall short of g^2, and the UE count
+    follows the APs actually placed.
     """
     rng = np.random.default_rng(seed)
+    window = None
 
     # --- APs on a jittered unit grid -------------------------------------
-    gx, gy = np.meshgrid(np.arange(g), np.arange(g))
-    ap_xy = np.stack([gx.ravel(), gy.ravel()], axis=1).astype(float)
-    ap_xy += rng.normal(0.0, jitter, ap_xy.shape)
+    if geo:
+        import haiq_geo
+        window = haiq_geo.window_for(g)
+        ap_xy = haiq_geo.place_aps(rng, g, window, jitter=jitter)
+        if len(ap_xy) == 0:
+            raise ValueError(f"no AP could be placed in {window}")
+    else:
+        gx, gy = np.meshgrid(np.arange(g), np.arange(g))
+        ap_xy = np.stack([gx.ravel(), gy.ravel()], axis=1).astype(float)
+        ap_xy += rng.normal(0.0, jitter, ap_xy.shape)
     n_ap = len(ap_xy)
 
     # --- RB pools: AP a owns RBs [a*n_rb_per_ap, (a+1)*n_rb_per_ap) ------
@@ -87,7 +111,10 @@ def make_instance(g=5, ue_per_ap=2.0, n_rb_per_ap=4, radius=1.2,
 
     # --- UEs uniform over the region -------------------------------------
     n_ue = int(round(ue_per_ap * n_ap))
-    ue_xy = rng.uniform(-0.5, g - 0.5, size=(n_ue, 2))
+    if geo:
+        ue_xy = haiq_geo.place_ues(rng, n_ue, window)
+    else:
+        ue_xy = rng.uniform(-0.5, g - 0.5, size=(n_ue, 2))
 
     # --- candidate sets ---------------------------------------------------
     # An AP offers each covered UE one RB from its own pool, allocated round
@@ -119,7 +146,8 @@ def make_instance(g=5, ue_per_ap=2.0, n_rb_per_ap=4, radius=1.2,
         keep.append(i)
 
     return Instance(ap_xy=ap_xy, ue_xy=ue_xy[keep], rb_owner=rb_owner,
-                    cand=cand, util=util, w_rb=w_rb, w_ap=w_ap, g=g, seed=seed)
+                    cand=cand, util=util, w_rb=w_rb, w_ap=w_ap, g=g, seed=seed,
+                    geo=window)
 
 
 def utility_scale(inst):
@@ -133,8 +161,11 @@ def utility_scale(inst):
 
 
 if __name__ == "__main__":
-    for g in (3, 5, 7):
-        inst = make_instance(g=g, seed=1)
-        degs = [len(c) for c in inst.cand]
-        print(f"g={g:2d}  APs={inst.n_ap:3d}  RBs={inst.n_rb:4d}  UEs={inst.n_ue:3d}  "
-              f"deg mean={np.mean(degs):.2f} max={max(degs)}  ubar={utility_scale(inst):.2f}")
+    for geo in (False, True):
+        print("campus placement" if geo else "square placement")
+        for g in (3, 5, 7):
+            inst = make_instance(g=g, seed=1, geo=geo)
+            degs = [len(c) for c in inst.cand]
+            print(f"  g={g:2d}  APs={inst.n_ap:3d}  RBs={inst.n_rb:4d}  "
+                  f"UEs={inst.n_ue:3d}  deg mean={np.mean(degs):.2f} "
+                  f"max={max(degs)}  ubar={utility_scale(inst):.2f}")

@@ -7,8 +7,13 @@ same generator, but they do not all read equally well as a picture.
 
 This renders the partition panel for a range of seeds side by side so the
 region can be chosen by eye, and prints the numbers that matter for the
-choice: how evenly the partitioner split the region, whether it left many
-single-AP zones, and how heavy the boundary is.
+choice: how many APs the ground actually accepted, how evenly the
+partitioner split the region, whether it left many single-AP zones, and how
+heavy the boundary is.
+
+Instances come from `make_fig_snapshot.build_instance`, so the preview is
+drawn on whatever geometry the figure uses -- with `snap.GEO` set, the same
+window of campus, over the same basemap.
 
 Set the chosen value as `SEED` in `make_fig_snapshot.py`.
 
@@ -22,7 +27,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from haiq_instance import make_instance, utility_scale
+from haiq_instance import utility_scale
 from haiq_partition import partition_aps
 from haiq_protocol import run_protocol
 from haiq_reference import solve_centralized
@@ -30,7 +35,7 @@ import make_fig_snapshot as snap
 
 
 def evaluate(seed):
-    inst = make_instance(g=snap.G, seed=seed)
+    inst = snap.build_instance(seed)
     opt, _, ok = solve_centralized(inst)
     if not ok:
         return None
@@ -42,18 +47,27 @@ def evaluate(seed):
     n_ap = [len(z) for z in part.zones if z]
     n_ue = [r["zone"].n_ue for r in active]
     return dict(seed=seed, inst=inst, part=part, res=res, active=active,
-                ratio=100.0 * res["utility"] / opt,
+                ratio=100.0 * res["utility"] / opt, n_ap=inst.n_ap,
                 zones=len(active), singles=sum(1 for a in n_ap if a == 1),
                 ap_spread=float(np.std(n_ap)), ue_spread=float(np.std(n_ue)),
                 bdens=100.0 * part.boundary_density)
 
 
 def main(n_seeds=8):
-    cands = [c for c in (evaluate(s) for s in range(n_seeds)) if c]
-    print(f"{'seed':>4} {'zones':>6} {'1-AP':>5} {'sd(APs)':>8} {'sd(N_z)':>8} "
-          f"{'|B|%':>6} {'ratio%':>7}")
+    scored = [(s, evaluate(s)) for s in range(n_seeds)]
+    cands = [c for _, c in scored if c]
+    dropped = [s for s, c in scored if c is None]
+    if dropped:
+        # On the campus a draw can be genuinely infeasible -- UEs bunch onto
+        # open ground faster than the APs facing it can admit them -- and the
+        # centralized reference then has no optimum to divide by.  Say which
+        # seeds went, so a thin contact sheet does not look like a bug.
+        print(f"no centralized optimum for seeds {dropped}; "
+              f"{len(cands)}/{n_seeds} shown\n")
+    print(f"{'seed':>4} {'APs':>4} {'zones':>6} {'1-AP':>5} {'sd(APs)':>8} "
+          f"{'sd(N_z)':>8} {'|B|%':>6} {'ratio%':>7}")
     for c in cands:
-        print(f"{c['seed']:>4} {c['zones']:>6} {c['singles']:>5} "
+        print(f"{c['seed']:>4} {c['n_ap']:>4} {c['zones']:>6} {c['singles']:>5} "
               f"{c['ap_spread']:>8.2f} {c['ue_spread']:>8.2f} "
               f"{c['bdens']:>6.0f} {c['ratio']:>7.2f}")
 

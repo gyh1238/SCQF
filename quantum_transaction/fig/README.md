@@ -14,18 +14,22 @@ a slide or a paper column without a white box.
 | `panels/*.svg` | each panel alone, vector, for editing in Inkscape/Illustrator |
 | `panels/*.png` | each panel alone, raster at 200 dpi, for quick viewing |
 | `seed_preview.png` | candidate snapshot regions side by side (`preview_seeds.py`) |
+| `campus.png` | basemap the snapshot region is cut from, and drawn over |
+| `ap_allowed_mask.png` | where an AP may stand: rooftops and lots, roads removed |
+| `ue_allowed_mask.png` | where a UE may stand: open ground only |
+| `placement_mask_preview.png` | the two masks over the basemap, for checking the trace |
 
 Panels:
 
 | file | panel |
 |---|---|
 | `panels/snapshot_a_partition.*` | (a) the partition |
-| `panels/snapshot_b1_zone_law_Z7.*` | (b1) zone Z7, 2 APs |
-| `panels/snapshot_b2_zone_law_Z9.*` | (b2) zone Z9, 1 AP |
-| `panels/snapshot_b3_zone_law_Z2.*` | (b3) zone Z2, 3 APs |
-| `panels/snapshot_b4_zone_law_Z1.*` | (b4) zone Z1, 3 APs |
-| `panels/snapshot_c1_joint_Z10_UE38_40.*` | (c1) joint vs. marginals, zone Z10 |
-| `panels/snapshot_c2_joint_Z9_UE25_38.*` | (c2) joint vs. marginals, zone Z9 |
+| `panels/snapshot_b1_zone_law_Z13.*` | (b1) zone Z13, 3 APs |
+| `panels/snapshot_b2_zone_law_Z5.*` | (b2) zone Z5, 2 APs |
+| `panels/snapshot_b3_zone_law_Z1.*` | (b3) zone Z1, 2 APs |
+| `panels/snapshot_b4_zone_law_Z8.*` | (b4) zone Z8, 1 AP |
+| `panels/snapshot_c1_joint_Z4_UE3_38.*` | (c1) joint vs. marginals, zone Z4 |
+| `panels/snapshot_c2_joint_Z13_UE29_36.*` | (c2) joint vs. marginals, zone Z13 |
 | `panels/snapshot_c3_ablation_joint_vs_marginals.*` | (c3) what dropping the joint list costs |
 | `panels/snapshot_d_decimation_order.*` | (d) order the boundary UEs were fixed |
 | `panels/scaling_a_circuit_cost.*` | (a) two-qubit gate count vs. zones |
@@ -33,7 +37,7 @@ Panels:
 | `panels/scaling_c_utility_ratio.*` | (c) utility ratio vs. zones |
 
 The zone indices and UE indices in the panel names are those of the snapshot
-instance (`g=5, seed=7`); they change if that instance changes, and each
+instance (`g=5, seed=14`); they change if that instance changes, and each
 script clears its own panels before writing so stale names cannot linger.
 
 Regenerate everything with:
@@ -55,7 +59,7 @@ Two caches hold the sweeps, since both take minutes to recompute:
 | cache | holds | force a recompute |
 |---|---|---|
 | `../scaling_data.npz` | the 40-instance growth sweep behind `fig_scaling` | `--recollect` |
-| `../ablation_data.npz` | the 16-instance joint-vs-marginal comparison behind (c3) | delete the file |
+| `../ablation_data.npz` | the joint-vs-marginal comparison behind (c3): the 12 of 16 campus instances with a centralized optimum | delete the file |
 
 How many panels each row shows is set by `N_ZONE_PANELS` (4) and
 `N_BND_PANELS` (2) in `make_fig_snapshot.py`; the grid widths follow.
@@ -170,25 +174,66 @@ the instances used) because an AP is the atom of the partition.
 | `n_rb_per_ap` | RBs per AP | 4 |
 | `radius` | coverage radius (AP spacing is 1.0) | 1.2 |
 | `max_deg` | candidates kept per UE, strongest APs first | 2 |
-| `seed` | instance seed | 0 – 5 (2 in the snapshot) |
+| `seed` | instance seed | 0 – 15 (14 in the snapshot) |
+| `geo` | take positions from the campus rasters | on for `fig_snapshot`, off for `fig_scaling` |
 
 Only `g` changes along the growth axis. Every density is held fixed, so
 growing `g` grows the *global* problem without changing local structure.
 
+### Campus placement (`geo=True`, `haiq_geo.py`)
+
+The densities above are unchanged; what changes is *where* the points may
+fall. One pixel unit is fixed at `PX_PER_UNIT` = 150 px per AP spacing, so a
+`g × g` instance is a `g × g` unit window of the campus, centred on
+`CENTER_PX` and grown about that point — `g` is still a pure size knob, the
+ground under it is simply not flat.
+
+- **APs**: the same jittered `g × g` lattice, each AP then snapped to the
+  nearest pixel of `ap_allowed_mask` within `AP_SNAP_MAX` = 0.55 units, no two
+  closer than `AP_MIN_SEP` = 0.35. A cell with nowhere legal to mount yields no
+  AP, so `n_ap` can fall below `g²`.
+- **UEs**: drawn uniformly over the *allowed area* of `ue_allowed_mask` rather
+  than over the square, so they follow streets and courtyards.
+
+Two consequences are worth knowing before reading the snapshot numbers
+against the scaling figure:
+
+- boundary density runs higher than on the square (≈ 60 % here against ≈ 50 %),
+  because irregular AP spacing puts more UEs within reach of two zones;
+- some seeds have **no centralized optimum at all** — UEs bunch onto open
+  ground faster than the APs facing it can admit them, and `solve_centralized`
+  returns infeasible. Both scripts skip those seeds and `preview_seeds.py`
+  prints which ones went.
+
+`python haiq_geo.py` re-derives `CENTER_PX`: it scans the campus for the
+window holding open ground *and* rooftops at every size in use.
+
+The scaling figure deliberately stays on the square. Its claim is about
+bounded density, and a flat lattice states that assumption without borrowing
+one campus's street plan; `scaling_data.npz` is therefore unaffected by any of
+the above.
+
 ## 3. `fig_snapshot` — one region, opened up
 
-Instance `g=5, seed=7`: 25 APs, 50 UEs, 11 zones, 22 boundary UEs (44 %).
+Instance `g=5, seed=14`, cut from the campus: 25 APs, 50 UEs, 14 zones,
+30 boundary UEs (60 %).
 
 The seed is chosen for legibility — compact zones, none of them holding a
 single UE, boundary links that can be traced. To keep that presentation choice
 from turning into a quality one, the caption reports where this instance's
-utility ratio falls among the candidates: 99.2 % against a candidate mean of
-99.3 % and a spread of 97.7–100 %. `preview_seeds.py` renders the candidates
-side by side and prints the numbers behind the choice.
+utility ratio falls among the candidates: 99.5 % against a candidate mean of
+99.4 % and a spread of 98.4–100 % over the 9 of 16 seeds that have a
+centralized optimum. `preview_seeds.py` renders the candidates side by side
+and prints the numbers behind the choice.
 
 ### (a) the partition
 
-- **axes**: the plane. No units; AP grid spacing is 1.0. Ticks are suppressed.
+- **axes**: the campus window the instance was cut from. No units; AP grid
+  spacing is 1.0, which is 150 px of the rasters. Ticks are suppressed.
+- **basemap**: the campus, blended 30 % to white. It is context, not a model
+  quantity — but it is the reason the APs sit where they do, since each stands
+  on ground `ap_allowed_mask` permits and each UE on ground `ue_allowed_mask`
+  permits.
 - **shading**: zone territory — each point takes the colour of the zone owning
   its *nearest* AP. This is a reading aid for where a zone sits, not a model
   quantity; zone membership of a UE is set by $\mathcal{V}_i$, not by distance.
@@ -237,8 +282,8 @@ not by eye. For every zone, `strongest_pair` takes each pair of its boundary
 UEs, forms the empirical joint over that pair and the outer product of the two
 marginals, and scores the pair by the total-variation distance between them;
 the zone keeps its worst pair, and the row shows the two worst zones. In the
-displayed instance that ranking runs TV = 0.40 (Z10), 0.39 (Z9), 0.37 (Z0),
-0.33, 0.26 … down to exactly 0.00 in the zones whose owned limits do not
+displayed instance that ranking runs TV = 0.37 (Z4), 0.35 (Z13), 0.35 (Z1),
+0.33, 0.32 … down to exactly 0.00 in the zones whose owned limits do not
 couple their boundary UEs — the dependence appears precisely where the
 constraints bind, which is why the panels are worth showing at all.
 
@@ -278,7 +323,7 @@ marginals versus no marginals; it is whether those marginals are re-taken
 from a list that has been conditioned on each commitment, or read once at the
 start and left alone. The joint list is what makes re-taking them possible.
 
-The mean gap is **+1.1 points** of utility, and 14 of 16 instances improve. That is worth reading against the
+The mean gap is **+1.8 points** of utility, and all 12 instances improve. That is worth reading against the
 total decomposition loss: the distributed result sits about 1 point below the
 centralized optimum, so the joint list is worth roughly as much as the entire
 remaining gap. This is the measured version of the manuscript's statement that
@@ -411,7 +456,10 @@ centralized circuit and the total traffic grow with it, at no cost in quality.
   will therefore do nothing; change the blend fraction instead. This exists
   because a partially transparent fill on a transparent background renders at
   full saturation in any viewer that flattens or ignores the alpha channel,
-  which made the PNGs disagree with the PDFs.
+  which made the PNGs disagree with the PDFs. The one exception is the zone
+  territory in (a) when it is drawn over the campus: there the alpha sits over
+  an opaque basemap, never over the transparent page, so it is a real alpha
+  (0.45) and may be edited as one.
 - Type sizes come from four constants at the top of `make_fig_snapshot.py` —
   `FS_TITLE` 8, `FS_LABEL` 7.5, `FS_TICK` 6.5, `FS_LEGEND` 6.2 — so panels
   cannot drift apart. The scaling figure sets its sizes inline, being three
