@@ -25,11 +25,11 @@ Panels:
 |---|---|
 | `panels/snapshot_a_partition.*` | (a) the partition |
 | `panels/snapshot_b1_zone_law_Z13.*` | (b1) zone Z13, 3 APs |
-| `panels/snapshot_b2_zone_law_Z5.*` | (b2) zone Z5, 2 APs |
-| `panels/snapshot_b3_zone_law_Z1.*` | (b3) zone Z1, 2 APs |
-| `panels/snapshot_b4_zone_law_Z8.*` | (b4) zone Z8, 1 AP |
-| `panels/snapshot_c1_joint_Z4_UE3_38.*` | (c1) joint vs. marginals, zone Z4 |
-| `panels/snapshot_c2_joint_Z13_UE29_36.*` | (c2) joint vs. marginals, zone Z13 |
+| `panels/snapshot_b2_zone_law_Z14.*` | (b2) zone Z14, 2 APs |
+| `panels/snapshot_b3_zone_law_Z6.*` | (b3) zone Z6, 3 APs |
+| `panels/snapshot_b4_zone_law_Z7.*` | (b4) zone Z7, 1 AP |
+| `panels/snapshot_c1_joint_Z10_UE27_47.*` | (c1) joint vs. marginals, zone Z10 |
+| `panels/snapshot_c2_joint_Z14_UE7_46.*` | (c2) joint vs. marginals, zone Z14 |
 | `panels/snapshot_c3_ablation_joint_vs_marginals.*` | (c3) what dropping the joint list costs |
 | `panels/snapshot_d_decimation_order.*` | (d) order the boundary UEs were fixed |
 | `panels/scaling_a_circuit_cost.*` | (a) two-qubit gate count vs. zones |
@@ -37,7 +37,7 @@ Panels:
 | `panels/scaling_c_utility_ratio.*` | (c) utility ratio vs. zones |
 
 The zone indices and UE indices in the panel names are those of the snapshot
-instance (`g=5, seed=14`); they change if that instance changes, and each
+instance (`g=5, seed=12`); they change if that instance changes, and each
 script clears its own panels before writing so stale names cannot linger.
 
 Regenerate everything with:
@@ -59,7 +59,7 @@ Two caches hold the sweeps, since both take minutes to recompute:
 | cache | holds | force a recompute |
 |---|---|---|
 | `../scaling_data.npz` | the 40-instance growth sweep behind `fig_scaling` | `--recollect` |
-| `../ablation_data.npz` | the joint-vs-marginal comparison behind (c3): the 12 of 16 campus instances with a centralized optimum | delete the file |
+| `../ablation_data.npz` | the joint-vs-marginal comparison behind (c3): the 15 of 16 campus instances with a centralized optimum | delete the file |
 
 How many panels each row shows is set by `N_ZONE_PANELS` (4) and
 `N_BND_PANELS` (2) in `make_fig_snapshot.py`; the grid widths follow.
@@ -183,10 +183,26 @@ growing `g` grows the *global* problem without changing local structure.
 ### Campus placement (`geo=True`, `haiq_geo.py`)
 
 The densities above are unchanged; what changes is *where* the points may
-fall. One pixel unit is fixed at `PX_PER_UNIT` = 150 px per AP spacing, so a
-`g × g` instance is a `g × g` unit window of the campus, centred on
-`CENTER_PX` and grown about that point — `g` is still a pure size knob, the
-ground under it is simply not flat.
+fall — and what `g` means.
+
+**The region is the whole campus, and `g` sets how densely it is covered.**
+There is no scale constant to pick: the model's unit is one AP spacing, and
+the spacing is whatever divides the campus into `g` cells. So `g = 5` reads as
+25 APs over the campus, not as a 5-unit window cut out of it, and no part of
+the map is spent on ground no instance ever uses.
+
+| `g` | one AP spacing | region |
+|---|---|---|
+| 4 | 372 px | 1488 px square — the largest the rasters hold, 79 % of their area |
+| 5 | 298 px | same |
+| 6 | 248 px | same |
+| 7 | 213 px | same |
+
+The rasters are wider than they are tall and the region is square by
+construction, so the square is taken at full height and centred; the left and
+right strips, about a fifth of the area, fall outside every instance. Reaching
+them would mean a rectangular region, which buys 21 % more ground at the cost
+of a panel that no longer fits the composite's left column.
 
 - **APs**: the same jittered `g × g` lattice, each AP then snapped to the
   nearest pixel of `ap_allowed_mask` within `AP_SNAP_MAX` = 0.55 units, no two
@@ -195,41 +211,50 @@ ground under it is simply not flat.
 - **UEs**: drawn uniformly over the *allowed area* of `ue_allowed_mask` rather
   than over the square, so they follow streets and courtyards.
 
+Inside the region 40 % of pixels admit an AP, 30 % admit a UE, and 13 % are
+rooftop that takes an AP but no UE. Everything the model measures — coverage
+radius, AP jitter, the snap distances — is in AP spacings, so none of it moves
+with `g`; what moves is how much campus one cell contains.
+
 Two consequences are worth knowing before reading the snapshot numbers
 against the scaling figure:
 
-- boundary density runs higher than on the square (≈ 60 % here against ≈ 50 %),
-  because irregular AP spacing puts more UEs within reach of two zones;
+- boundary density runs a little higher than on the square, because irregular
+  AP spacing puts more UEs within reach of two zones (46 % for the displayed
+  seed, against a square baseline near 50 % and a campus spread of 46–82 %);
 - some seeds have **no centralized optimum at all** — UEs bunch onto open
   ground faster than the APs facing it can admit them, and `solve_centralized`
-  returns infeasible. Both scripts skip those seeds and `preview_seeds.py`
-  prints which ones went.
+  returns infeasible. 14 of 16 survive. Both scripts skip the rest and
+  `preview_seeds.py` prints which ones went.
 
-`python haiq_geo.py` re-derives `CENTER_PX`: it scans the campus for the
-window holding open ground *and* rooftops at every size in use.
+`python haiq_geo.py` prints the footprint at each `g` and how much of it each
+mask allows.
 
-The scaling figure deliberately stays on the square. Its claim is about
-bounded density, and a flat lattice states that assumption without borrowing
-one campus's street plan; `scaling_data.npz` is therefore unaffected by any of
-the above.
+The scaling figure deliberately stays on the square, and the two axes are not
+the same: growing `g` here covers the same ground more finely, while the
+scaling figure's `g` covers more ground at fixed density — which is the
+assumption its claim rests on, stated by a flat lattice rather than borrowed
+from one campus's street plan. `scaling_data.npz` is unaffected by any of the
+above.
 
 ## 3. `fig_snapshot` — one region, opened up
 
-Instance `g=5, seed=14`, cut from the campus: 25 APs, 50 UEs, 14 zones,
-30 boundary UEs (60 %).
+Instance `g=5, seed=12`, laid over the campus: 25 APs, 50 UEs, 12 zones,
+23 boundary UEs (46 %).
 
 The seed is chosen for legibility — compact zones, none of them holding a
 single UE, boundary links that can be traced. To keep that presentation choice
 from turning into a quality one, the caption reports where this instance's
-utility ratio falls among the candidates: 99.5 % against a candidate mean of
-99.4 % and a spread of 98.4–100 % over the 9 of 16 seeds that have a
+utility ratio falls among the candidates: 99.6 % against a candidate mean of
+99.0 % and a spread of 97.1–100 % over the 14 of 16 seeds that have a
 centralized optimum. `preview_seeds.py` renders the candidates side by side
 and prints the numbers behind the choice.
 
 ### (a) the partition
 
-- **axes**: the campus window the instance was cut from. No units; AP grid
-  spacing is 1.0, which is 150 px of the rasters. Ticks are suppressed.
+- **axes**: the campus, edge to edge — the region is the whole map, so the
+  panel carries no margin. No units; AP grid spacing is 1.0, which at `g=5` is
+  298 px of the rasters. Ticks are suppressed.
 - **basemap**: the campus, blended 22 % to white. It is context, not a model
   quantity — but it is the reason the APs sit where they do, since each stands
   on ground `ap_allowed_mask` permits and each UE on ground `ue_allowed_mask`
@@ -286,9 +311,9 @@ not by eye. For every zone, `strongest_pair` takes each pair of its boundary
 UEs, forms the empirical joint over that pair and the outer product of the two
 marginals, and scores the pair by the total-variation distance between them;
 the zone keeps its worst pair, and the row shows the two worst zones. In the
-displayed instance that ranking runs TV = 0.37 (Z4), 0.35 (Z13), 0.35 (Z1),
-0.33, 0.32 … down to exactly 0.00 in the zones whose owned limits do not
-couple their boundary UEs — the dependence appears precisely where the
+displayed instance that ranking runs TV = 0.40 (Z10), 0.39 (Z14), 0.30 (Z13),
+0.29, 0.13 … down to 0.01 in the zones whose owned limits barely couple their
+boundary UEs — the dependence appears precisely where the
 constraints bind, which is why the panels are worth showing at all.
 
 The TV value is not printed on the panel: it selects what to show, and the
@@ -327,7 +352,7 @@ marginals versus no marginals; it is whether those marginals are re-taken
 from a list that has been conditioned on each commitment, or read once at the
 start and left alone. The joint list is what makes re-taking them possible.
 
-The mean gap is **+1.8 points** of utility, and all 12 instances improve. That is worth reading against the
+The mean gap is **+1.3 points** of utility, and all 15 instances improve. That is worth reading against the
 total decomposition loss: the distributed result sits about 1 point below the
 centralized optimum, so the joint list is worth roughly as much as the entire
 remaining gap. This is the measured version of the manuscript's statement that
@@ -465,6 +490,14 @@ centralized circuit and the total traffic grow with it, at no cost in quality.
   there is no large tinted area in that panel at all. The outline colour is
   `_shade(zone, 0.25)` — darkened, not tinted, because a line has far less
   area than a fill to carry a colour with.
+- **`dpi` matters in the vector files too.** The campus basemap is the only
+  raster these figures carry, and matplotlib resamples it to the output
+  resolution before embedding, so a `dpi` chosen for the PNGs silently decided
+  how much of the map survived into the PDF. `_raster_dpi` now asks the figure
+  instead: it returns the resolution at which every embedded image lands at
+  its own pixel size, which is about 300 dpi for the standalone (a) and 440
+  for the composite, where the same map is drawn smaller. Nothing else here is
+  a raster, so that costs only the panel with the map.
 - Type sizes come from four constants at the top of `make_fig_snapshot.py` —
   `FS_TITLE` 8, `FS_LABEL` 7.5, `FS_TICK` 6.5, `FS_LEGEND` 6.2 — so panels
   cannot drift apart. The scaling figure sets its sizes inline, being three

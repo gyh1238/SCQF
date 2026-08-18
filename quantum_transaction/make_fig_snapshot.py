@@ -21,10 +21,11 @@ Panels, each carrying one checkable claim rather than an illustration:
  (d) the order decimation fixed the boundary UEs: one point per UE.
 
 The instance comes from the same generator as the scaling figure, but with
-`GEO` set it is cut from a real campus rather than from a bare square: APs
+`GEO` set it is laid over a real campus rather than over a bare square: APs
 stand on the rooftops and lots they are allowed to occupy, UEs on open
 ground, and panel (a) is drawn over the map so the shape of a zone can be
-read against the buildings that produced it.  See `haiq_geo.py`.  The
+read against the buildings that produced it.  The region is the whole
+campus, and `G` is how densely it is covered.  See `haiq_geo.py`.  The
 scaling figure stays on the square, where a flat lattice states the bounded
 density its claim rests on; both are the same protocol on the same
 generator, differing only in where the points are allowed to fall.
@@ -59,7 +60,7 @@ from haiq_cost import BUDGET_DEFAULT
 PANEL_DIR = "fig/panels"
 
 G = 5
-SEED = 14          # chosen for legibility; see pick_seed and preview_seeds.py
+SEED = 12          # chosen for legibility; see pick_seed and preview_seeds.py
 BETA = 1.5
 K_ACCEPT = 200
 SHOT_BUDGET = 10_000
@@ -102,34 +103,51 @@ def _shade(color, frac):
     return ((1 - frac) * r, (1 - frac) * g, (1 - frac) * b)
 
 
-VECTOR_DPI = 300   # resolution the campus basemap is embedded at in pdf/svg
+def _raster_dpi(fig, floor=200):
+    """The dpi at which every image in `fig` embeds at its own resolution.
+
+    `dpi` decides something in a vector file too, and it is easy to lose:
+    matplotlib resamples an embedded raster to the *output* resolution before
+    writing it.  The only raster these figures carry is the campus basemap,
+    and at the 200 dpi the PNGs want it went into the composite at two thirds
+    of the source density -- detail discarded for nothing, and soft beside
+    text that stays sharp at any zoom.
+
+    Asking the figure rather than naming a constant is what keeps that from
+    coming back: the same basemap is drawn at about 3.4 in in the composite
+    and 5 in on its own, so no single dpi is right for both -- either the
+    small one loses detail or the large one pays for pixels it cannot show.
+    Nothing else here is a raster, so the answer costs only the map.
+    """
+    need = float(floor)
+    fig.canvas.draw()                        # an equal-aspect axes is only
+    for ax in fig.axes:                      # sized to its content on draw
+        for im in ax.get_images():
+            h, w = np.shape(im.get_array())[:2]
+            box = ax.get_window_extent()
+            need = max(need, w / (box.width / fig.dpi),
+                       h / (box.height / fig.dpi))
+    return need
 
 
 def _save(fig, stem, formats=("pdf", "svg", "png"), **kw):
-    """Every output is written on a transparent background.
-
-    `dpi` means something in a vector file too, and it is easy to lose: the
-    only raster these figures carry is the campus basemap, and matplotlib
-    resamples it to the *output* resolution before embedding.  At the 200 dpi
-    the PNGs want, the map inside the composite came out below the resolution
-    of the source raster -- detail thrown away for nothing, and visibly soft
-    beside text that stays sharp at any zoom.  Vector formats therefore get
-    `VECTOR_DPI`, which puts the embedded map at or above its source density
-    (150 px per AP spacing) in both the composite and the standalone panels.
-    """
+    """Every output is written on a transparent background."""
+    vector_dpi = None
     for ext in formats:
         kw_ext = dict(kw)
         if ext in ("pdf", "svg"):
-            kw_ext["dpi"] = max(kw.get("dpi", 0), VECTOR_DPI)
+            if vector_dpi is None:
+                vector_dpi = _raster_dpi(fig, floor=kw.get("dpi", 200))
+            kw_ext["dpi"] = vector_dpi
         fig.savefig(f"{stem}.{ext}", transparent=True, **kw_ext)
 
 
 def build_instance(seed, g=None):
     """The instance every panel of this figure -- and `preview_seeds` -- uses.
 
-    One place decides whether the region is the bare square or a window of
-    campus, so the preview cannot end up choosing a seed on one geometry
-    while the figure renders another.
+    One place decides whether the region is the bare square or the campus,
+    so the preview cannot end up choosing a seed on one geometry while the
+    figure renders another.
     """
     return make_instance(g=G if g is None else g, seed=seed, geo=GEO)
 
@@ -179,8 +197,11 @@ def panel_map(ax, inst, part, active, zcol):
         # the window the instance was cut from, so frame that instead.  A UE on
         # its edge would otherwise widen the view and break the alignment
         # between the drawn extent and the ground the masks describe.
-        lo = inst.geo.lo - 0.30
-        hi = inst.geo.lo + inst.geo.side + 0.30
+        # Exactly the window, with no margin: the region already fills the
+        # rasters top to bottom, so any padding is ground the basemap cannot
+        # cover and shows as a white band above and below the map.
+        lo = inst.geo.lo
+        hi = inst.geo.lo + inst.geo.side
     else:
         lo = np.minimum(inst.ue_xy.min(axis=0), inst.ap_xy.min(axis=0)) - 0.30
         hi = np.maximum(inst.ue_xy.max(axis=0), inst.ap_xy.max(axis=0)) + 0.30
@@ -201,7 +222,7 @@ def panel_map(ax, inst, part, active, zcol):
     on_map = inst.geo is not None
     if on_map:
         import haiq_geo
-        img, extent = haiq_geo.basemap(inst.geo, pad=0.60, wash=0.22)
+        img, extent = haiq_geo.basemap(inst.geo, wash=0.22)
         # "antialiased" picks the right filter in both directions -- the same
         # basemap is minified in the composite and magnified in the standalone
         # panel, and bilinear aliases the thin street lines when minifying.

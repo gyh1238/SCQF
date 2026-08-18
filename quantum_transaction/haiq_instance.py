@@ -19,12 +19,13 @@ degree" regime the manuscript invokes in Sec. V-D.
 
 Passing `geo=True` keeps every density above but takes the *positions* from
 a real campus (`haiq_geo`): APs snap to the rooftops and lots they are
-allowed to occupy, UEs are drawn over open ground only.  A `g` x `g` window
-of campus stands in for the `g` x `g` square, so `g` is still a pure size
-knob; what changes is that coverage overlap now follows streets and
-courtyards instead of a lattice.  The snapshot figure uses it, the scaling
-sweep does not -- the scaling claim is about density, and a flat lattice
-states that assumption without borrowing one campus's street plan.
+allowed to occupy, UEs are drawn over open ground only.  There the region is
+the whole campus at every `g`, and `g` says how densely it is covered, so a
+larger `g` sees the same ground in finer grain rather than seeing more of
+it.  That is a different axis from the one above, and deliberately so: the
+snapshot figure uses the campus, the scaling sweep does not -- the scaling
+claim is about bounded density under growth, and a flat lattice states that
+assumption without borrowing one campus's street plan.
 """
 
 from dataclasses import dataclass
@@ -81,11 +82,12 @@ def make_instance(g=5, ue_per_ap=2.0, n_rb_per_ap=4, radius=1.2,
     Densities (UEs per AP, RBs per AP, coverage radius, candidate degree)
     are independent of `g`, so `g` is a pure problem-size knob.
 
-    With `geo=True` the same densities are laid on a g x g window of the
-    campus rasters instead of on the bare square: APs snap to allowed
-    ground, UEs are drawn over allowed ground.  A cell with nowhere legal to
-    mount yields no AP, so `n_ap` may fall short of g^2, and the UE count
-    follows the APs actually placed.
+    With `geo=True` the same densities are laid over the campus rasters
+    instead of over the bare square, the region being the whole campus
+    divided into g x g cells: APs snap to allowed ground, UEs are drawn over
+    allowed ground.  A cell with nowhere legal to mount yields no AP, so
+    `n_ap` may fall short of g^2, and the UE count follows the APs actually
+    placed.
     """
     rng = np.random.default_rng(seed)
     window = None
