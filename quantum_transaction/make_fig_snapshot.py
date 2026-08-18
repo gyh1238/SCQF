@@ -102,10 +102,26 @@ def _shade(color, frac):
     return ((1 - frac) * r, (1 - frac) * g, (1 - frac) * b)
 
 
+VECTOR_DPI = 300   # resolution the campus basemap is embedded at in pdf/svg
+
+
 def _save(fig, stem, formats=("pdf", "svg", "png"), **kw):
-    """Every output is written on a transparent background."""
+    """Every output is written on a transparent background.
+
+    `dpi` means something in a vector file too, and it is easy to lose: the
+    only raster these figures carry is the campus basemap, and matplotlib
+    resamples it to the *output* resolution before embedding.  At the 200 dpi
+    the PNGs want, the map inside the composite came out below the resolution
+    of the source raster -- detail thrown away for nothing, and visibly soft
+    beside text that stays sharp at any zoom.  Vector formats therefore get
+    `VECTOR_DPI`, which puts the embedded map at or above its source density
+    (150 px per AP spacing) in both the composite and the standalone panels.
+    """
     for ext in formats:
-        fig.savefig(f"{stem}.{ext}", transparent=True, **kw)
+        kw_ext = dict(kw)
+        if ext in ("pdf", "svg"):
+            kw_ext["dpi"] = max(kw.get("dpi", 0), VECTOR_DPI)
+        fig.savefig(f"{stem}.{ext}", transparent=True, **kw_ext)
 
 
 def build_instance(seed, g=None):
@@ -186,8 +202,11 @@ def panel_map(ax, inst, part, active, zcol):
     if on_map:
         import haiq_geo
         img, extent = haiq_geo.basemap(inst.geo, pad=0.60, wash=0.22)
-        ax.imshow(img, extent=extent, origin="upper", interpolation="bilinear",
-                  zorder=-1)
+        # "antialiased" picks the right filter in both directions -- the same
+        # basemap is minified in the composite and magnified in the standalone
+        # panel, and bilinear aliases the thin street lines when minifying.
+        ax.imshow(img, extent=extent, origin="upper",
+                  interpolation="antialiased", zorder=-1)
 
     for z in range(len(part.zones)):
         if not part.zones[z]:
