@@ -24,6 +24,7 @@ Panels:
 | file | panel |
 |---|---|
 | `panels/snapshot_a_partition.*` | (a) the partition |
+| `panels/snapshot_a_partition_colour_basemap.*` | (a) again, campus left in colour — for slides |
 | `panels/snapshot_b1_zone_law_Z0.*` | (b1) zone Z0, 2 APs |
 | `panels/snapshot_b2_zone_law_Z8.*` | (b2) zone Z8, 2 APs |
 | `panels/snapshot_b3_zone_law_Z12.*` | (b3) zone Z12, 3 APs |
@@ -283,6 +284,13 @@ and prints the numbers behind the choice.
   no AP is out on the hillside and none of them is grey. Most of the reduction
   is saturation rather than contrast, so the map keeps every edge it had while
   colour is left to mean zone and nothing else.
+
+  `panels/snapshot_a_partition_colour_basemap.*` is the same panel with the
+  desaturation off. The muted one is right for the paper, where the page is
+  already dense and colour has to mean zone; on a slide the map is the thing
+  being pointed at and its own colour helps. Both are written every run, one
+  `desat` apart — set `BASEMAP_DESAT = 0.0` in `make_fig_snapshot.py` to put
+  the composite in colour as well.
 - **coloured outlines**: zone territory — the border of the region whose every
   point has its *nearest* AP in that zone, drawn in the zone's colour over a
   white line. Territories are outlined rather than filled here: a fill heavy

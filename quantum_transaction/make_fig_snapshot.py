@@ -72,6 +72,7 @@ FS_LEGEND = 6.2
 COL_RATIO = "#1f6fb4"
 
 GEO = True         # place the region on the campus rasters; see haiq_geo.py
+BASEMAP_DESAT = 0.85   # how far the campus is pulled toward its own luminance
 
 N_ZONE_PANELS = 4
 N_BND_PANELS = 2
@@ -180,7 +181,7 @@ def pick_seed(seed=SEED, seeds=range(16)):
     return chosen, peers
 
 
-def panel_map(ax, inst, part, active, zcol):
+def panel_map(ax, inst, part, active, zcol, desat=None):
     """(a) the partition, annotated with the resources it produced.
 
     Zones are drawn as territories -- each point of the plane is shaded by
@@ -220,7 +221,8 @@ def panel_map(ax, inst, part, active, zcol):
     on_map = inst.geo is not None
     if on_map:
         import haiq_geo
-        img, extent = haiq_geo.basemap(inst.geo)
+        img, extent = haiq_geo.basemap(
+            inst.geo, desat=BASEMAP_DESAT if desat is None else desat)
         # "antialiased" picks the right filter in both directions -- the same
         # basemap is minified in the composite and magnified in the standalone
         # panel, and bilinear aliases the thin street lines when minifying.
@@ -627,6 +629,15 @@ def main():
                   (3.4, 3.2), lambda ax: panel_ablation(ax, abl)))
     specs.append(("snapshot_d_decimation_order", (4.2, 3.2),
                   lambda ax: panel_order(ax, res)))
+    if GEO:
+        # (a) once more with the campus left in colour.  The desaturated one
+        # is right for the paper, where the page is already dense and colour
+        # has to mean zone; on a slide the map is the thing being pointed at
+        # and its own colour helps.  Same instance, same marks, one setting
+        # apart -- so it is written rather than reconstructed by hand later.
+        specs.append(("snapshot_a_partition_colour_basemap", (6.4, 6.4),
+                      lambda ax: panel_map(ax, inst, part, active, zcol,
+                                           desat=0.0)))
 
     for stem, size, draw in specs:
         f, a = plt.subplots(figsize=size)
