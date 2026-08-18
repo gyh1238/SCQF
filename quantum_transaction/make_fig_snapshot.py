@@ -50,6 +50,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.colors import to_rgb
 from matplotlib.patches import Patch
+from matplotlib.patheffects import withStroke
 
 from haiq_instance import make_instance, utility_scale
 from haiq_partition import partition_aps
@@ -193,13 +194,10 @@ def panel_map(ax, inst, part, active, zcol):
     # white band where the grid stops.  Fix the extent first -- square, so that
     # `aspect("equal")` cannot pad one side -- and build the grid on it.
     if inst.geo is not None:
-        # On the campus the region is not "wherever the points landed": it is
-        # the window the instance was cut from, so frame that instead.  A UE on
-        # its edge would otherwise widen the view and break the alignment
-        # between the drawn extent and the ground the masks describe.
-        # Exactly the window, with no margin: the region already fills the
-        # rasters top to bottom, so any padding is ground the basemap cannot
-        # cover and shows as a white band above and below the map.
+        # Exactly the region, with no margin: on the campus the frame is not
+        # "wherever the points landed" but the ground the masks describe, and
+        # that already fills the rasters top to bottom, so any padding is
+        # ground the basemap cannot cover and shows as a white band.
         lo = inst.geo.lo
         hi = inst.geo.lo + inst.geo.side
     else:
@@ -222,7 +220,7 @@ def panel_map(ax, inst, part, active, zcol):
     on_map = inst.geo is not None
     if on_map:
         import haiq_geo
-        img, extent = haiq_geo.basemap(inst.geo, wash=0.22)
+        img, extent = haiq_geo.basemap(inst.geo)
         # "antialiased" picks the right filter in both directions -- the same
         # basemap is minified in the composite and magnified in the standalone
         # panel, and bilinear aliases the thin street lines when minifying.
@@ -257,13 +255,21 @@ def panel_map(ax, inst, part, active, zcol):
                        colors=[_shade(zcol.get(z, "#999999"), 0.25)],
                        linewidths=1.3, zorder=1.1)
 
+    # Over the map every mark is competing with printed streets and building
+    # edges, so each is laid on a white stroke of its own.  On the bare square
+    # there is nothing to compete with and the page is transparent, where a
+    # white halo would print as a white blob -- so it is added only on the map.
+    def halo(width):
+        return [withStroke(linewidth=width, foreground="white")] if on_map else []
+
     # boundary UEs are joined to the APs that offer them a candidate RB
     bset = set(part.boundary.tolist())
     for i in bset:
         for r in inst.cand[i]:
             a = inst.ap_xy[inst.rb_owner[r]]
             ax.plot([inst.ue_xy[i, 0], a[0]], [inst.ue_xy[i, 1], a[1]],
-                    color=_tint("#c1440e", 0.55), lw=0.55, zorder=2)
+                    color="#c1440e" if on_map else _tint("#c1440e", 0.55),
+                    lw=0.55, zorder=2, path_effects=halo(1.6))
 
     for z, aps in enumerate(part.zones):
         if not aps:
@@ -271,17 +277,20 @@ def panel_map(ax, inst, part, active, zcol):
         xy = inst.ap_xy[aps]
         ax.scatter(xy[:, 0], xy[:, 1], s=120, marker="s",
                    color=zcol.get(z, "#dddddd"), edgecolor="black",
-                   linewidth=0.7, zorder=4)
+                   linewidth=0.7, zorder=4, path_effects=halo(2.6))
 
     for i in range(inst.n_ue):
         x, y = inst.ue_xy[i]
         if i in bset:
             ax.scatter(x, y, s=28, marker="o", facecolor="white",
-                       edgecolor="#c1440e", linewidth=1.3, zorder=5)
+                       edgecolor="#c1440e", linewidth=1.3, zorder=5,
+                       path_effects=halo(2.2))
         else:
-            ax.scatter(x, y, s=11, marker="o",
-                       color=_tint(zcol.get(part.ue_zones[i][0], "#999999"), 0.85),
-                       zorder=3)
+            ax.scatter(x, y, s=14 if on_map else 11, marker="o",
+                       color=_tint(zcol.get(part.ue_zones[i][0], "#999999"),
+                                   0.95 if on_map else 0.85),
+                       edgecolor="white" if on_map else "none",
+                       linewidth=0.5, zorder=3)
 
     for r in active:
         zone = r["zone"]

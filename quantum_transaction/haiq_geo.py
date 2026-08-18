@@ -285,14 +285,20 @@ def place_ues(rng, n, win):
     return cand[idx] + rng.uniform(-half, half, size=(n, 2))
 
 
-def basemap(win, pad=0.0, wash=0.22):
+def basemap(win, pad=0.0, wash=0.38, desat=0.85):
     """The campus image cropped to `win`, for drawing under a panel.
 
     Returns `(rgb, extent)` with `extent` in model units and the array in
-    `origin="upper"` order, so it goes straight into `imshow`.  It is blended
-    `wash` of the way to white -- enough that the zone outlines over it stay
-    the thing being read, little enough that the buildings and streets the
-    placement follows are still identifiable.
+    `origin="upper"` order, so it goes straight into `imshow`.
+
+    Two knobs, and they do different jobs.  `wash` blends toward white, which
+    lowers everything at once -- push it far enough to make a marker stand out
+    and the streets go with it.  `desat` blends toward the image's own
+    luminance instead, which costs the map nothing structurally: buildings,
+    roads and parks keep every edge they had, they simply stop competing for
+    hue with the zone colours and the markers drawn over them.  Taking most of
+    the reduction out of saturation rather than out of contrast is what lets
+    the map stay legible while the model on top of it reads first.
     """
     img = _load(BASEMAP_FILE)
     h, w = img.shape[:2]
@@ -305,6 +311,8 @@ def basemap(win, pad=0.0, wash=0.22):
     if img.shape[2] == 4:                       # composite onto white first
         a = img[r0:r1, c0:c1, 3:4].astype(float) / 255.0
         rgb = rgb * a + (1.0 - a)
+    lum = rgb @ np.array([0.2126, 0.7152, 0.0722])   # Rec. 709
+    rgb = desat * lum[..., None] + (1.0 - desat) * rgb
     rgb = wash + (1.0 - wash) * rgb
 
     xa, ya = win.to_world(c0, r1 - 1)

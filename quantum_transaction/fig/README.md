@@ -276,11 +276,13 @@ and prints the numbers behind the choice.
 - **axes**: the campus, edge to edge — the region is the whole map, so the
   panel carries no margin. No units; the nominal AP spacing is 1.0 by
   definition, which at `g=5` is 298 px of the rasters. Ticks are suppressed.
-- **basemap**: the campus, blended 22 % to white. It is context, not a model
-  quantity — but it is the reason the APs sit where they do: each carries an
-  equal share of the ground `ue_allowed_mask` permits and stands on ground
-  `ap_allowed_mask` permits, so no AP is out on the hillside and none of them
-  is grey.
+- **basemap**: the campus, desaturated 85 % toward its own luminance and then
+  blended 38 % to white. It is context, not a model quantity — but it is the
+  reason the APs sit where they do: each carries an equal share of the ground
+  `ue_allowed_mask` permits and stands on ground `ap_allowed_mask` permits, so
+  no AP is out on the hillside and none of them is grey. Most of the reduction
+  is saturation rather than contrast, so the map keeps every edge it had while
+  colour is left to mean zone and nothing else.
 - **coloured outlines**: zone territory — the border of the region whose every
   point has its *nearest* AP in that zone, drawn in the zone's colour over a
   white line. Territories are outlined rather than filled here: a fill heavy
@@ -289,7 +291,10 @@ and prints the numbers behind the choice.
   filled instead, there being nothing behind them to hide. Either way this is
   a reading aid for where a zone sits, not a model quantity; zone membership
   of a UE is set by $\mathcal{V}_i$, not by distance.
-- **squares**: APs, coloured by zone.
+- **squares**: APs, coloured by zone. Over the map each mark also carries a
+  white stroke of its own, so it separates from printed streets and building
+  edges; on the square there is nothing to separate from and the halo is
+  omitted, since a white halo on a transparent page prints as a white blob.
 - **open orange circles**: boundary UEs.
 - **small filled dots**: interior UEs, coloured by their single zone.
 - **thin orange lines**: each boundary UE joined to the APs that offer it a
@@ -520,6 +525,12 @@ centralized circuit and the total traffic grow with it, at no cost in quality.
   its own pixel size, which is about 300 dpi for the standalone (a) and 440
   for the composite, where the same map is drawn smaller. Nothing else here is
   a raster, so that costs only the panel with the map.
+- **Markers stay shapes, not icons.** An antenna glyph for the APs was drawn
+  and rejected: at the size this panel gives a marker its arcs do not resolve,
+  and a stroked glyph carries almost no fill, which is where the zone colour
+  lives. A triangle reads about as well as the square and no better. The
+  square wins on the one thing that matters here — it is the largest patch of
+  unambiguous colour a marker of that size can be.
 - Type sizes come from four constants at the top of `make_fig_snapshot.py` —
   `FS_TITLE` 8, `FS_LABEL` 7.5, `FS_TICK` 6.5, `FS_LEGEND` 6.2 — so panels
   cannot drift apart. The scaling figure sets its sizes inline, being three
