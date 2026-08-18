@@ -32,10 +32,13 @@ composite's left column.
 
 What changes in an instance built this way:
 
-  * APs keep their one-per-cell density, but each is snapped to the nearest
-    pixel it is allowed to occupy.  A cell whose surroundings are all road
-    or hillside yields no AP, so the AP count can fall below `g^2`.
-  * UEs are drawn uniformly over the *allowed area* rather than over the
+  * APs are placed to carry *equal shares* of the ground a UE may stand on,
+    not one per lattice cell, and are then snapped to a roof or lot they may
+    legally occupy.  A lattice would spend APs on the hillside, where they
+    cover nobody, while overloading the ones that landed on open ground; and
+    equalising by centroid alone is not enough, so the share is imposed as a
+    capacity constraint (`_balanced_assign`).
+  * UEs are drawn uniformly over that same allowed area rather than over the
     square, so they cluster along streets and courtyards.
 
 Both effects push coverage overlap around, which is what the partitioner and
@@ -69,6 +72,7 @@ AP_SNAP_MAX = 0.55          # units: give up on a cell with nothing nearer
 AP_MIN_SEP = 0.35           # units: two APs may not share one rooftop
 _STRIDE_AP = 3              # candidate pixels are subsampled; APs are few
 _STRIDE_UE = 2
+_STRIDE_DEMAND = 8          # coarser still: this one only has to find centroids
 
 _cache = {}
 
@@ -177,29 +181,85 @@ def _allowed_xy(kind, win, stride):
     return _cache[key]
 
 
-def place_aps(rng, g, win, jitter=0.18):
-    """One AP per grid cell, snapped to the nearest pixel it may occupy.
+def _balanced_assign(d2, cap):
+    """Give every AP the same amount of ground, nearest ground first.
 
-    The nominal grid and its jitter are the synthetic generator's, so the
-    intended density is unchanged; the snap is what the campus imposes.  A
-    cell with no allowed pixel within `AP_SNAP_MAX`, or none left once
-    `AP_MIN_SEP` is honoured, contributes no AP -- that is a planner finding
-    nowhere to mount, and it is allowed to show.
+    Plain Lloyd is the obvious way to spread APs over the usable area and it
+    does not do what is wanted here: a centroidal tessellation makes each AP
+    the centre of its own cell, which on a domain shaped like a campus still
+    leaves cells differing sevenfold.  The small cells are the APs that end up
+    serving nobody, so the equalisation has to be a constraint, not a hope.
+
+    Each (ground, AP) pair is taken in order of distance and accepted if the
+    ground is still free and the AP is not yet full.  The result is an exactly
+    balanced assignment that stays close to nearest-AP, which is the same
+    greedy any capacity-constrained tessellation starts from.
+    """
+    n, k = d2.shape
+    order = np.argsort(d2, axis=None)
+    owner = np.full(n, -1, dtype=int)
+    count = np.zeros(k, dtype=int)
+    left = n
+    for flat in order:
+        p, a = flat // k, flat % k
+        if owner[p] < 0 and count[a] < cap:
+            owner[p] = a
+            count[a] += 1
+            left -= 1
+            if left == 0:
+                break
+    return owner
+
+
+def place_aps(rng, g, win, jitter=0.18, iters=8):
+    """`g^2` APs spread over the ground that has users, then put on real roofs.
+
+    A lattice laid straight over a campus spends APs on whatever the square
+    happens to contain.  On this map that is a wooded hillside and a river of
+    road: those APs cover nobody, their zones carry no UE, and the partition
+    then divides a region a third of which no user can stand in.  Meanwhile
+    the APs that did land on open ground are asked to admit far more UEs than
+    `W_a` allows, which is the same imbalance seen from the other end.
+
+    So the APs are placed where the demand is.  Demand is the UE-allowed area
+    itself -- UEs are drawn uniformly over it, so equal area is equal expected
+    load -- and Lloyd's algorithm from the jittered lattice moves each AP to
+    the centroid of the ground closest to it.  What comes out is the flat
+    statement of a planner's rule: every AP serves about the same share of the
+    campus that anyone actually occupies.  `seed` still varies the deployment,
+    through the lattice the iteration starts from.
+
+    Each AP is then snapped to the nearest pixel it may legally occupy, which
+    is usually a step of nothing -- most open ground is AP-allowed too -- and
+    at most a step onto the roof or lot next door.  `AP_MIN_SEP` keeps two of
+    them off the same roof.
     """
     cand = _allowed_xy("ap", win, _STRIDE_AP)
+    demand = _allowed_xy("ue", win, _STRIDE_DEMAND)
     if len(cand) == 0:
         raise ValueError(f"no AP-allowed pixel in {win}")
+    if len(demand) == 0:
+        raise ValueError(f"no UE-allowed pixel in {win}")
 
     gx, gy = np.meshgrid(np.arange(g), np.arange(g))
-    nominal = np.stack([gx.ravel(), gy.ravel()], axis=1) + 0.5
-    nominal = nominal + rng.normal(0.0, jitter, nominal.shape)
+    ap = np.stack([gx.ravel(), gy.ravel()], axis=1) + 0.5
+    ap = ap + rng.normal(0.0, jitter, ap.shape)
+
+    cap = int(np.ceil(len(demand) / len(ap)))
+    for _ in range(iters):
+        d2 = ((demand[:, None, :] - ap[None, :, :]) ** 2).sum(axis=2)
+        owner = _balanced_assign(d2, cap)
+        for k in range(len(ap)):
+            mine = owner == k
+            if mine.any():
+                ap[k] = demand[mine].mean(axis=0)
 
     # distance to the nearest AP placed so far, carried forward rather than
     # recomputed: the candidate list runs to six figures at the finer scales,
     # and the all-pairs form allocated a matrix that size once per AP.
     nearest = np.full(len(cand), np.inf)
     placed = []
-    for p in nominal:
+    for p in ap:
         d = np.linalg.norm(cand - p, axis=1)
         ok = (d <= AP_SNAP_MAX) & (nearest >= AP_MIN_SEP)
         if not ok.any():

@@ -18,8 +18,10 @@ figure, and it is exactly the "bounded zone density and bounded candidate
 degree" regime the manuscript invokes in Sec. V-D.
 
 Passing `geo=True` keeps every density above but takes the *positions* from
-a real campus (`haiq_geo`): APs snap to the rooftops and lots they are
-allowed to occupy, UEs are drawn over open ground only.  There the region is
+a real campus (`haiq_geo`): UEs are drawn over open ground only, and the APs
+are placed to carry equal shares of that ground before being snapped to a
+roof or lot they may legally occupy -- a lattice laid over a campus spends
+APs on hillside nobody stands on.  There the region is
 the whole campus at every `g`, and `g` says how densely it is covered, so a
 larger `g` sees the same ground in finer grain rather than seeing more of
 it.  That is a different axis from the one above, and deliberately so: the
@@ -83,11 +85,11 @@ def make_instance(g=5, ue_per_ap=2.0, n_rb_per_ap=4, radius=1.2,
     are independent of `g`, so `g` is a pure problem-size knob.
 
     With `geo=True` the same densities are laid over the campus rasters
-    instead of over the bare square, the region being the whole campus
-    divided into g x g cells: APs snap to allowed ground, UEs are drawn over
-    allowed ground.  A cell with nowhere legal to mount yields no AP, so
-    `n_ap` may fall short of g^2, and the UE count follows the APs actually
-    placed.
+    instead of over the bare square, the region being the whole campus and
+    `g^2` the number of APs on it: the APs are spread to carry equal shares
+    of the ground a UE may stand on, then snapped to allowed ground.  An AP
+    with nowhere legal to mount is dropped, so `n_ap` may fall short of g^2,
+    and the UE count follows the APs actually placed.
     """
     rng = np.random.default_rng(seed)
     window = None

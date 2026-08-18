@@ -60,7 +60,7 @@ from haiq_cost import BUDGET_DEFAULT
 PANEL_DIR = "fig/panels"
 
 G = 5
-SEED = 12          # chosen for legibility; see pick_seed and preview_seeds.py
+SEED = 3           # chosen for legibility; see pick_seed and preview_seeds.py
 BETA = 1.5
 K_ACCEPT = 200
 SHOT_BUDGET = 10_000

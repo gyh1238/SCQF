@@ -24,12 +24,12 @@ Panels:
 | file | panel |
 |---|---|
 | `panels/snapshot_a_partition.*` | (a) the partition |
-| `panels/snapshot_b1_zone_law_Z13.*` | (b1) zone Z13, 3 APs |
-| `panels/snapshot_b2_zone_law_Z14.*` | (b2) zone Z14, 2 APs |
-| `panels/snapshot_b3_zone_law_Z6.*` | (b3) zone Z6, 3 APs |
-| `panels/snapshot_b4_zone_law_Z7.*` | (b4) zone Z7, 1 AP |
-| `panels/snapshot_c1_joint_Z10_UE27_47.*` | (c1) joint vs. marginals, zone Z10 |
-| `panels/snapshot_c2_joint_Z14_UE7_46.*` | (c2) joint vs. marginals, zone Z14 |
+| `panels/snapshot_b1_zone_law_Z0.*` | (b1) zone Z0, 2 APs |
+| `panels/snapshot_b2_zone_law_Z8.*` | (b2) zone Z8, 2 APs |
+| `panels/snapshot_b3_zone_law_Z12.*` | (b3) zone Z12, 3 APs |
+| `panels/snapshot_b4_zone_law_Z4.*` | (b4) zone Z4, 1 AP |
+| `panels/snapshot_c1_joint_Z4_UE20_22.*` | (c1) joint vs. marginals, zone Z4 |
+| `panels/snapshot_c2_joint_Z3_UE13_37.*` | (c2) joint vs. marginals, zone Z3 |
 | `panels/snapshot_c3_ablation_joint_vs_marginals.*` | (c3) what dropping the joint list costs |
 | `panels/snapshot_d_decimation_order.*` | (d) order the boundary UEs were fixed |
 | `panels/scaling_a_circuit_cost.*` | (a) two-qubit gate count vs. zones |
@@ -37,7 +37,7 @@ Panels:
 | `panels/scaling_c_utility_ratio.*` | (c) utility ratio vs. zones |
 
 The zone indices and UE indices in the panel names are those of the snapshot
-instance (`g=5, seed=12`); they change if that instance changes, and each
+instance (`g=5, seed=3`); they change if that instance changes, and each
 script clears its own panels before writing so stale names cannot linger.
 
 Regenerate everything with:
@@ -204,28 +204,49 @@ right strips, about a fifth of the area, fall outside every instance. Reaching
 them would mean a rectangular region, which buys 21 % more ground at the cost
 of a panel that no longer fits the composite's left column.
 
-- **APs**: the same jittered `g × g` lattice, each AP then snapped to the
-  nearest pixel of `ap_allowed_mask` within `AP_SNAP_MAX` = 0.55 units, no two
-  closer than `AP_MIN_SEP` = 0.35. A cell with nowhere legal to mount yields no
-  AP, so `n_ap` can fall below `g²`.
 - **UEs**: drawn uniformly over the *allowed area* of `ue_allowed_mask` rather
   than over the square, so they follow streets and courtyards.
+- **APs**: placed to carry **equal shares of that same allowed area**, then
+  snapped to the nearest pixel of `ap_allowed_mask` within `AP_SNAP_MAX` = 0.55
+  units, no two closer than `AP_MIN_SEP` = 0.35. An AP with nowhere legal to
+  mount is dropped, so `n_ap` can fall below `g²`.
+
+  Equal shares, not a lattice, because a lattice laid over a campus spends APs
+  on whatever the square contains — here a wooded hillside and a river of road.
+  Those APs cover nobody, so their zones carry no UE and show in panel (a) as
+  grey squares, while the APs that did land on open ground are asked to admit
+  far more UEs than `W_a` allows. Since UEs are drawn uniformly over the
+  allowed area, equal area *is* equal expected load, and the rule is just the
+  flat statement of what a planner does.
+
+  Equalising by centroid alone does not do it: plain Lloyd converges to a
+  centroidal tessellation whose cells still differ sevenfold on a domain this
+  shape, and the small cells are exactly the APs that serve nobody. The share
+  is therefore imposed as a capacity constraint — each patch of ground goes to
+  the nearest AP that is not yet full — which brings the spread down from
+  cv 0.40 to 0.16 and removes the grey squares. `seed` still varies the
+  deployment, through the jittered lattice the iteration starts from.
 
 Inside the region 40 % of pixels admit an AP, 30 % admit a UE, and 13 % are
 rooftop that takes an AP but no UE. Everything the model measures — coverage
 radius, AP jitter, the snap distances — is in AP spacings, so none of it moves
 with `g`; what moves is how much campus one cell contains.
 
-Two consequences are worth knowing before reading the snapshot numbers
-against the scaling figure:
+Placed this way the campus reads level with the square on everything that
+matters, over 16 seeds at `g=5`:
 
-- boundary density runs a little higher than on the square, because irregular
-  AP spacing puts more UEs within reach of two zones (46 % for the displayed
-  seed, against a square baseline near 50 % and a campus spread of 46–82 %);
-- some seeds have **no centralized optimum at all** — UEs bunch onto open
-  ground faster than the APs facing it can admit them, and `solve_centralized`
-  returns infeasible. 14 of 16 survive. Both scripts skip the rest and
-  `preview_seeds.py` prints which ones went.
+| | square | campus |
+|---|---|---|
+| boundary density, mean | 59 % | 58 % |
+| APs in no UE's candidate set | 0.6 / 25 | 0.8 / 25 |
+| APs covering nothing at all | 0.2 / 25 | 0.2 / 25 |
+| seeds with a centralized optimum | 16 / 16 | 14 / 16 |
+
+The one place it does not reach parity is feasibility: on a campus some draws
+have **no centralized optimum at all** — UEs bunch onto open ground faster
+than the APs facing it can admit them, and `solve_centralized` returns
+infeasible. Both scripts skip those seeds and `preview_seeds.py` prints which
+ones went.
 
 `python haiq_geo.py` prints the footprint at each `g` and how much of it each
 mask allows.
@@ -239,26 +260,27 @@ above.
 
 ## 3. `fig_snapshot` — one region, opened up
 
-Instance `g=5, seed=12`, laid over the campus: 25 APs, 50 UEs, 12 zones,
-23 boundary UEs (46 %).
+Instance `g=5, seed=3`, laid over the campus: 25 APs, 49 UEs, 13 zones,
+24 boundary UEs (49 %).
 
 The seed is chosen for legibility — compact zones, none of them holding a
 single UE, boundary links that can be traced. To keep that presentation choice
 from turning into a quality one, the caption reports where this instance's
-utility ratio falls among the candidates: 99.6 % against a candidate mean of
-99.0 % and a spread of 97.1–100 % over the 14 of 16 seeds that have a
+utility ratio falls among the candidates: 99.5 % against a candidate mean of
+99.3 % and a spread of 97.7–99.8 % over the 14 of 16 seeds that have a
 centralized optimum. `preview_seeds.py` renders the candidates side by side
 and prints the numbers behind the choice.
 
 ### (a) the partition
 
 - **axes**: the campus, edge to edge — the region is the whole map, so the
-  panel carries no margin. No units; AP grid spacing is 1.0, which at `g=5` is
-  298 px of the rasters. Ticks are suppressed.
+  panel carries no margin. No units; the nominal AP spacing is 1.0 by
+  definition, which at `g=5` is 298 px of the rasters. Ticks are suppressed.
 - **basemap**: the campus, blended 22 % to white. It is context, not a model
-  quantity — but it is the reason the APs sit where they do, since each stands
-  on ground `ap_allowed_mask` permits and each UE on ground `ue_allowed_mask`
-  permits.
+  quantity — but it is the reason the APs sit where they do: each carries an
+  equal share of the ground `ue_allowed_mask` permits and stands on ground
+  `ap_allowed_mask` permits, so no AP is out on the hillside and none of them
+  is grey.
 - **coloured outlines**: zone territory — the border of the region whose every
   point has its *nearest* AP in that zone, drawn in the zone's colour over a
   white line. Territories are outlined rather than filled here: a fill heavy
@@ -311,9 +333,9 @@ not by eye. For every zone, `strongest_pair` takes each pair of its boundary
 UEs, forms the empirical joint over that pair and the outer product of the two
 marginals, and scores the pair by the total-variation distance between them;
 the zone keeps its worst pair, and the row shows the two worst zones. In the
-displayed instance that ranking runs TV = 0.40 (Z10), 0.39 (Z14), 0.30 (Z13),
-0.29, 0.13 … down to 0.01 in the zones whose owned limits barely couple their
-boundary UEs — the dependence appears precisely where the
+displayed instance that ranking runs TV = 0.38 (Z4), 0.34 (Z3), 0.34 (Z1),
+0.34, 0.32 … down to exactly 0.00 in the zones whose owned limits do not
+couple their boundary UEs — the dependence appears precisely where the
 constraints bind, which is why the panels are worth showing at all.
 
 The TV value is not printed on the panel: it selects what to show, and the
@@ -352,7 +374,7 @@ marginals versus no marginals; it is whether those marginals are re-taken
 from a list that has been conditioned on each commitment, or read once at the
 start and left alone. The joint list is what makes re-taking them possible.
 
-The mean gap is **+1.3 points** of utility, and all 15 instances improve. That is worth reading against the
+The mean gap is **+1.0 point** of utility, and 11 of 15 instances improve. That is worth reading against the
 total decomposition loss: the distributed result sits about 1 point below the
 centralized optimum, so the joint list is worth roughly as much as the entire
 remaining gap. This is the measured version of the manuscript's statement that
