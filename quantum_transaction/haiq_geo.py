@@ -75,16 +75,38 @@ BASEMAP_FILE = "campus.png"
 BS_MAP_FILE = "real_bs.png"
 
 # real_bs.png is a screenshot of the registered-base-station map over the same
-# ground, at a different zoom and from a different map provider.  Both are
-# north-up, so one scale and one offset relate them:  campus_px = s*bs_px + d.
-# The fit is by landmark (the running track, the Korea University Road) and
-# checked by eye against `bs_overlay.png`; automatic registration does not work
-# here, and it is worth saying why rather than leaving someone to retry it --
-# campus.png is a 3D render with extruded buildings and real_bs.png is a flat
-# near-monochrome map, so the two share almost no pixel statistics (edge
-# correlation 0.04, mutual information 0.016 nats: both noise).  Residual at
-# the landmark is about 15 px, a twentieth of an AP spacing at g=5.
-BS_TO_CAMPUS = (1.027, 219.0, 108.0)
+# ground, from a different provider at a different zoom and crop.  Both are
+# north-up, so a scale and an offset per axis relate them:
+#
+#     campus_px = (sx, sy) * bs_px + (dx, dy)
+#
+# and the two scales are separate because they came out different: the source
+# crops the two axes differently, and one scale left the masts bunched into
+# the left half of a map they cover the whole of.
+#
+# **This fit is by eye and cannot be anything else.**  Four automatic criteria
+# were tried and every one of them failed, which is worth recording so that
+# nobody spends the afternoon again:
+#
+#   edge correlation        0.04          noise
+#   mutual information      0.016 nats    noise
+#   road-mask correlation   flat optimum over sx 0.9-1.15
+#   masts on allowed ground 37-44% across every candidate, against 40% for
+#                           points thrown at random
+#
+# The first two fail because campus.png is a 3D render with extruded buildings
+# and real_bs.png a flat near-monochrome map: they share almost no pixel
+# statistics.  The last is the interesting one -- at no transform do the masts
+# prefer ground the AP mask allows, which says the mask is not evidence about
+# where a base station goes.  A rooftop in a 3D render is drawn displaced from
+# its own footprint, and a good share of real masts stand at the roadside,
+# which the mask excludes.
+#
+# So: change these numbers if the overlay looks wrong to you, and regenerate
+# `fig/bs_overlay.png` with `python haiq_geo.py` to see what you did.  Anchored
+# on the running track, whose centre reads (258, 108) on the source and
+# (470, 210) on the campus.
+BS_TO_CAMPUS = (1.40, 1.10, 108.8, 91.2)   # sx, sy, dx, dy
 BS_MERGE_PX = 18.0          # several operators register masts at one site
 BS_SNAP_MAX = 0.70          # units: how far an AP may reach for a real mast
 # 0.70 is a trade, and both ends of it are measured.  Reaching further puts
@@ -277,8 +299,8 @@ def _extract_bs():
         if found == 0:
             break
 
-    s, dx, dy = BS_TO_CAMPUS
-    xy = np.array(hits, dtype=float) * s + np.array([dx, dy])
+    sx, sy, dx, dy = BS_TO_CAMPUS
+    xy = np.array(hits, dtype=float) * np.array([sx, sy]) + np.array([dx, dy])
     group = fcluster(linkage(xy, "single"), t=BS_MERGE_PX, criterion="distance")
     return np.array([xy[group == k].mean(axis=0) for k in np.unique(group)])
 

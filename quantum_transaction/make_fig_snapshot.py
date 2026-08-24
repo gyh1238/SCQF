@@ -22,9 +22,9 @@ Panels, each carrying one checkable claim rather than an illustration:
 
 The instance comes from the same generator as the scaling figure, but with
 `GEO` set it is laid over a real campus rather than over a bare square: APs
-stand on the rooftops and lots they are allowed to occupy, UEs on open
-ground, and panel (a) is drawn over the map so the shape of a zone can be
-read against the buildings that produced it.  The region is the whole
+stand on registered base stations read off the operators' map, UEs on open
+ground, and panel (a) is drawn over the campus so the shape of a zone can be
+read against the ground that produced it.  The region is the whole
 campus, and `G` is how densely it is covered.  See `haiq_geo.py`.  The
 scaling figure stays on the square, where a flat lattice states the bounded
 density its claim rests on; both are the same protocol on the same
@@ -61,7 +61,7 @@ from haiq_cost import BUDGET_DEFAULT
 PANEL_DIR = "fig/panels"
 
 G = 5
-SEED = 6           # chosen for legibility; see pick_seed and preview_seeds.py
+SEED = 0           # chosen for legibility; see pick_seed and preview_seeds.py
 BETA = 1.5
 K_ACCEPT = 200
 SHOT_BUDGET = 10_000
