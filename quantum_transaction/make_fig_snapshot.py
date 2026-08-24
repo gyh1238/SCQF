@@ -72,7 +72,7 @@ FS_LEGEND = 6.2
 COL_RATIO = "#1f6fb4"
 
 GEO = True         # place the region on the campus rasters; see haiq_geo.py
-BASEMAP_DESAT = 0.85   # how far the campus is pulled toward its own luminance
+BASEMAP_DESAT = 0.0    # how far the campus is pulled toward its own luminance
 
 N_ZONE_PANELS = 4
 N_BND_PANELS = 2
@@ -179,6 +179,19 @@ def pick_seed(seed=SEED, seeds=range(16)):
     chosen = run_seed(seed)
     peers = [r[0] for s in seeds if (r := run_seed(s))]
     return chosen, peers
+
+
+def _tag(ax, letter):
+    """Put the panel's letter in front of its title.
+
+    Only (a) carried one, so the composite held four histograms and three bar
+    charts that a caption -- or this repository's README -- could name as (b2)
+    or (c3) while the reader could not.  Prefixing the title it already has
+    keeps every panel self-labelling without spending layout on a corner tag,
+    and setting the text on the title object instead of calling `set_title`
+    again preserves the size that panel gave it.
+    """
+    ax.title.set_text(f"({letter}) {ax.title.get_text()}")
 
 
 def panel_map(ax, inst, part, active, zcol, desat=None):
@@ -303,7 +316,7 @@ def panel_map(ax, inst, part, active, zcol, desat=None):
                     zorder=6, linespacing=0.95,
                     bbox=dict(boxstyle="round,pad=0.12", fc="white", ec="none"))
 
-    ax.set_title(f"(a) partition under a {BUDGET_DEFAULT} two-qubit budget\n"
+    ax.set_title(f"partition under a {BUDGET_DEFAULT} two-qubit budget\n"
                  f"{inst.n_ap} APs, {inst.n_ue} UEs "
                  f"$\\rightarrow$ {len(active)} zones, "
                  f"$|\\mathcal{{B}}|$={len(part.boundary)} boundary UEs "
@@ -557,9 +570,16 @@ def panel_order(ax, res):
     ax.set_xlabel("boundary UE, in decimation order", fontsize=FS_LABEL)
     ax.set_ylabel(r"confidence $\max_v b_i(v)$", fontsize=FS_LABEL)
     n_exc = res["exceptions"]
-    ax.set_title(f"each boundary UE fixed once, least\n"
-                 f"ambiguous first  ·  {n_exc} re-sample"
-                 f"{'' if n_exc == 1 else 's'}", fontsize=FS_TITLE)
+    # The re-sample count moves off the title and into the panel.  This is the
+    # narrowest column in the composite and the panel letter now sits in front
+    # of the title, which left the count fitting at one digit and overflowing
+    # at two -- a caption that breaks on the value it reports.  Inside the
+    # axes it has room at any count, in a corner the curve does not reach.
+    ax.set_title("each boundary UE fixed once,\nleast ambiguous first",
+                 fontsize=FS_TITLE)
+    ax.annotate(f"{n_exc} exception re-sample{'' if n_exc == 1 else 's'}",
+                (0.97, 0.95), xycoords="axes fraction", ha="right", va="top",
+                fontsize=FS_LEGEND, color="#555555")
     ax.grid(alpha=0.3, lw=0.5)
     ax.tick_params(labelsize=FS_TICK)
 
@@ -581,22 +601,31 @@ def main():
     gs = fig.add_gridspec(2, 5, width_ratios=[1.95, 1, 1, 1, 1],
                           height_ratios=[1, 1])
 
-    panel_map(fig.add_subplot(gs[:, 0]), inst, part, active, zcol)
+    ax_map = fig.add_subplot(gs[:, 0])
+    panel_map(ax_map, inst, part, active, zcol)
+    _tag(ax_map, "a")
 
     zone_panels = pick_zone_panels(active, N_ZONE_PANELS)
     for j, r in enumerate(zone_panels):
-        panel_zone_law(fig.add_subplot(gs[0, 1 + j]), r, zcol, j == 0)
+        ax = fig.add_subplot(gs[0, 1 + j])
+        panel_zone_law(ax, r, zcol, j == 0)
+        _tag(ax, f"b{j + 1}")
 
     pairs = [(ri, best) for ri, rep in enumerate(reports)
              if (best := strongest_pair(rep)) is not None]
     pairs.sort(key=lambda it: -it[1][0])
     pairs = pairs[:N_BND_PANELS]
     for j, item in enumerate(pairs):
-        panel_boundary(fig.add_subplot(gs[1, 1 + j]), item, inst, reports,
-                       zcol, j == 0)
+        ax = fig.add_subplot(gs[1, 1 + j])
+        panel_boundary(ax, item, inst, reports, zcol, j == 0)
+        _tag(ax, f"c{j + 1}")
     abl = ablation_data()
-    panel_ablation(fig.add_subplot(gs[1, 1 + N_BND_PANELS]), abl)
-    panel_order(fig.add_subplot(gs[1, 4]), res)
+    ax = fig.add_subplot(gs[1, 1 + N_BND_PANELS])
+    panel_ablation(ax, abl)
+    _tag(ax, f"c{N_BND_PANELS + 1}")
+    ax = fig.add_subplot(gs[1, 4])
+    panel_order(ax, res)
+    _tag(ax, "d")
 
     # No figure title and no caption block: the caption belongs to the
     # document that places the figure, and the numbers behind this instance
@@ -630,18 +659,19 @@ def main():
     specs.append(("snapshot_d_decimation_order", (4.2, 3.2),
                   lambda ax: panel_order(ax, res)))
     if GEO:
-        # (a) once more with the campus left in colour.  The desaturated one
-        # is right for the paper, where the page is already dense and colour
-        # has to mean zone; on a slide the map is the thing being pointed at
-        # and its own colour helps.  Same instance, same marks, one setting
-        # apart -- so it is written rather than reconstructed by hand later.
-        specs.append(("snapshot_a_partition_colour_basemap", (6.4, 6.4),
+        # (a) once more with the campus pulled to grey.  The colour map is the
+        # one in use: it is what the panel points at, and the markers carry
+        # white strokes so they read over it.  The muted one is there for a
+        # page too dense to spend hue on context.  Same instance, same marks,
+        # one setting apart -- written rather than rebuilt by hand.
+        specs.append(("snapshot_a_partition_muted_basemap", (6.4, 6.4),
                       lambda ax: panel_map(ax, inst, part, active, zcol,
-                                           desat=0.0)))
+                                           desat=0.85)))
 
     for stem, size, draw in specs:
         f, a = plt.subplots(figsize=size)
         draw(a)
+        _tag(a, stem.split("_")[1])      # the letter the file is named for
         f.tight_layout()
         _save(f, f"{PANEL_DIR}/{stem}", bbox_inches="tight", dpi=200)
         plt.close(f)

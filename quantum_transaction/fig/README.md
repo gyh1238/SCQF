@@ -24,7 +24,7 @@ Panels:
 | file | panel |
 |---|---|
 | `panels/snapshot_a_partition.*` | (a) the partition |
-| `panels/snapshot_a_partition_colour_basemap.*` | (a) again, campus left in colour — for slides |
+| `panels/snapshot_a_partition_muted_basemap.*` | (a) again, campus pulled to grey — for a dense page |
 | `panels/snapshot_b1_zone_law_Z0.*` | (b1) zone Z0, 2 APs |
 | `panels/snapshot_b2_zone_law_Z8.*` | (b2) zone Z8, 2 APs |
 | `panels/snapshot_b3_zone_law_Z12.*` | (b3) zone Z12, 3 APs |
@@ -277,20 +277,18 @@ and prints the numbers behind the choice.
 - **axes**: the campus, edge to edge — the region is the whole map, so the
   panel carries no margin. No units; the nominal AP spacing is 1.0 by
   definition, which at `g=5` is 298 px of the rasters. Ticks are suppressed.
-- **basemap**: the campus, desaturated 85 % toward its own luminance and then
-  blended 38 % to white. It is context, not a model quantity — but it is the
-  reason the APs sit where they do: each carries an equal share of the ground
-  `ue_allowed_mask` permits and stands on ground `ap_allowed_mask` permits, so
-  no AP is out on the hillside and none of them is grey. Most of the reduction
-  is saturation rather than contrast, so the map keeps every edge it had while
-  colour is left to mean zone and nothing else.
+- **basemap**: the campus in its own colours, blended 38 % to white. It is
+  context, not a model quantity — but it is the reason the APs sit where they
+  do: each carries an equal share of the ground `ue_allowed_mask` permits and
+  stands on ground `ap_allowed_mask` permits, so no AP is out on the hillside
+  and none of them is grey. What keeps the map from swallowing the model is
+  not a heavier wash but the white stroke under every marker and outline.
 
-  `panels/snapshot_a_partition_colour_basemap.*` is the same panel with the
-  desaturation off. The muted one is right for the paper, where the page is
-  already dense and colour has to mean zone; on a slide the map is the thing
-  being pointed at and its own colour helps. Both are written every run, one
-  `desat` apart — set `BASEMAP_DESAT = 0.0` in `make_fig_snapshot.py` to put
-  the composite in colour as well.
+  `panels/snapshot_a_partition_muted_basemap.*` is the same panel with the map
+  pulled 85 % toward its own luminance — every edge kept, hue removed — for a
+  page too dense to spend colour on context. Both are written every run, one
+  `desat` apart; `BASEMAP_DESAT` in `make_fig_snapshot.py` sets which one the
+  composite uses.
 - **coloured outlines**: zone territory — the border of the region whose every
   point has its *nearest* AP in that zone, drawn in the zone's colour over a
   white line. Territories are outlined rather than filled here: a fill heavy
@@ -413,8 +411,10 @@ that misreading.
 
 The downward trend is the procedure working as intended: the least ambiguous
 boundary UEs are fixed first, and each commitment conditions the retained
-lists before the next choice. The title reports how many exception re-samples
-the run needed.
+lists before the next choice. The count of exception re-samples the run needed
+is annotated inside the panel, in the corner the curve does not reach — it was
+in the title until the panel letter went in front of it, where it fitted at one
+digit and overflowed at two.
 
 ## 4. `fig_scaling` — growing the region
 
@@ -533,6 +533,10 @@ centralized circuit and the total traffic grow with it, at no cost in quality.
   its own pixel size, which is about 300 dpi for the standalone (a) and 440
   for the composite, where the same map is drawn smaller. Nothing else here is
   a raster, so that costs only the panel with the map.
+- Every panel carries its letter in front of its own title — `_tag` sets the
+  text on the title object, so the panel keeps the size it chose. The
+  standalone files take the letter from their own file name, so the picture
+  and the file cannot disagree about which panel it is.
 - **Markers stay shapes, not icons.** An antenna glyph for the APs was drawn
   and rejected: at the size this panel gives a marker its arcs do not resolve,
   and a stroked glyph carries almost no fill, which is where the zone colour
