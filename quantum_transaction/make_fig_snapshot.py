@@ -61,7 +61,7 @@ from haiq_cost import BUDGET_DEFAULT
 PANEL_DIR = "fig/panels"
 
 G = 5
-SEED = 3           # chosen for legibility; see pick_seed and preview_seeds.py
+SEED = 6           # chosen for legibility; see pick_seed and preview_seeds.py
 BETA = 1.5
 K_ACCEPT = 200
 SHOT_BUDGET = 10_000
@@ -338,7 +338,7 @@ def panel_map(ax, inst, part, active, zcol, desat=None):
         # two lines, not one: in the composite this panel is narrower than the
         # standalone, and a single line of this ran into the neighbouring axes
         title=("outline: zone territory (nearest AP)\n"
-               "basemap: campus; APs on rooftops, UEs on open ground"
+               "basemap: campus; APs on registered masts, UEs on open ground"
                if on_map else "shading: zone territory (nearest AP)"),
         title_fontsize=7.5, alignment="left")
 

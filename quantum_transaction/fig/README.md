@@ -18,6 +18,8 @@ a slide or a paper column without a white box.
 | `ap_allowed_mask.png` | where an AP may stand: rooftops and lots, roads removed |
 | `ue_allowed_mask.png` | where a UE may stand: open ground only |
 | `placement_mask_preview.png` | the two masks over the basemap, for checking the trace |
+| `real_bs.png` | registered base stations over the same ground (source screenshot) |
+| `bs_overlay.png` | the masts read out of it, drawn on the campus — the alignment check |
 
 Panels:
 
@@ -25,12 +27,12 @@ Panels:
 |---|---|
 | `panels/snapshot_a_partition.*` | (a) the partition |
 | `panels/snapshot_a_partition_muted_basemap.*` | (a) again, campus pulled to grey — for a dense page |
-| `panels/snapshot_b1_zone_law_Z0.*` | (b1) zone Z0, 2 APs |
-| `panels/snapshot_b2_zone_law_Z8.*` | (b2) zone Z8, 2 APs |
-| `panels/snapshot_b3_zone_law_Z12.*` | (b3) zone Z12, 3 APs |
-| `panels/snapshot_b4_zone_law_Z4.*` | (b4) zone Z4, 1 AP |
-| `panels/snapshot_c1_joint_Z4_UE20_22.*` | (c1) joint vs. marginals, zone Z4 |
-| `panels/snapshot_c2_joint_Z3_UE13_37.*` | (c2) joint vs. marginals, zone Z3 |
+| `panels/snapshot_b1_zone_law_Z11.*` | (b1) zone Z11, 3 APs |
+| `panels/snapshot_b2_zone_law_Z1.*` | (b2) zone Z1, 2 APs |
+| `panels/snapshot_b3_zone_law_Z6.*` | (b3) zone Z6, 2 APs |
+| `panels/snapshot_b4_zone_law_Z10.*` | (b4) zone Z10, 1 AP |
+| `panels/snapshot_c1_joint_Z3_UE0_18.*` | (c1) joint vs. marginals, zone Z3 |
+| `panels/snapshot_c2_joint_Z7_UE1_37.*` | (c2) joint vs. marginals, zone Z7 |
 | `panels/snapshot_c3_ablation_joint_vs_marginals.*` | (c3) what dropping the joint list costs |
 | `panels/snapshot_d_decimation_order.*` | (d) order the boundary UEs were fixed |
 | `panels/scaling_a_circuit_cost.*` | (a) two-qubit gate count vs. zones |
@@ -38,7 +40,7 @@ Panels:
 | `panels/scaling_c_utility_ratio.*` | (c) utility ratio vs. zones |
 
 The zone indices and UE indices in the panel names are those of the snapshot
-instance (`g=5, seed=3`); they change if that instance changes, and each
+instance (`g=5, seed=6`); they change if that instance changes, and each
 script clears its own panels before writing so stale names cannot linger.
 
 Regenerate everything with:
@@ -208,9 +210,11 @@ of a panel that no longer fits the composite's left column.
 - **UEs**: drawn uniformly over the *allowed area* of `ue_allowed_mask` rather
   than over the square, so they follow streets and courtyards.
 - **APs**: placed to carry **equal shares of that same allowed area**, then
-  snapped to the nearest pixel of `ap_allowed_mask` within `AP_SNAP_MAX` = 0.55
-  units, no two closer than `AP_MIN_SEP` = 0.35. An AP with nowhere legal to
-  mount is dropped, so `n_ap` can fall below `g²`.
+  snapped onto a base station that is really there — see below. Where no mast
+  is in reach the fallback is the nearest pixel of `ap_allowed_mask` within
+  `AP_SNAP_MAX` = 0.55 units; no two APs come closer than `AP_MIN_SEP` = 0.35,
+  and an AP with nowhere legal to mount is dropped, so `n_ap` can fall below
+  `g²`.
 
   Equal shares, not a lattice, because a lattice laid over a campus spends APs
   on whatever the square contains — here a wooded hillside and a river of road.
@@ -249,8 +253,38 @@ than the APs facing it can admit them, and `solve_centralized` returns
 infeasible. Both scripts skip those seeds and `preview_seeds.py` prints which
 ones went.
 
-`python haiq_geo.py` prints the footprint at each `g` and how much of it each
-mask allows.
+### Real base stations (`real_bs.png`, `bs_sites`)
+
+`real_bs.png` is a screenshot of the registered-base-station map over the same
+ground. The masts are read back out of the picture — each is one teardrop pin
+of a fixed size, so this is template matching, and since pins overlap
+constantly a matched pin is erased and the match re-run until a pass finds
+nothing (78 detections in one pass, 135 after erasing). Operators register per
+carrier and per band, so pins within 18 px are merged: **180 distinct masts**
+inside the region, about 7 per AP.
+
+Placement then snaps each balanced AP onto the nearest unused mast within
+`BS_SNAP_MAX` = 0.70 units. **19 of 25 APs stand on a registered mast** in the
+displayed instance, about three quarters across seeds; the rest fall back to
+allowed ground, mostly in the bottom strip the screenshot does not reach.
+
+`BS_SNAP_MAX` is a trade and both ends of it are measured — reaching further
+puts more APs on real masts (68 % at 0.45, 77 % at 0.70, 83 % at 1.0) and costs
+the balancing that put them where the demand is (share spread cv 0.23, 0.28,
+0.36, against 0.40 for the unbalanced Lloyd this was built to beat).
+
+**The alignment is by hand and has to be checked by eye.** The two images are
+north-up, so one scale and one offset relate them —
+`BS_TO_CAMPUS = (1.027, 219, 108)`, fitted on the running track and 고려대로,
+residual about 15 px or a twentieth of an AP spacing. Automatic registration
+does *not* work here and it is worth not retrying: `campus.png` is a 3D render
+with extruded buildings, `real_bs.png` a flat near-monochrome map, and the two
+share almost no pixel statistics (edge correlation 0.04, mutual information
+0.016 nats — both noise). `bs_overlay.png` is the check; regenerate it with
+`python haiq_geo.py`.
+
+`python haiq_geo.py` prints the footprint at each `g`, how much of it each mask
+allows, the mast count, and rewrites the overlay.
 
 The scaling figure deliberately stays on the square, and the two axes are not
 the same: growing `g` here covers the same ground more finely, while the
@@ -261,14 +295,14 @@ above.
 
 ## 3. `fig_snapshot` — one region, opened up
 
-Instance `g=5, seed=3`, laid over the campus: 25 APs, 49 UEs, 13 zones,
-24 boundary UEs (49 %).
+Instance `g=5, seed=6`, laid over the campus: 25 APs, 50 UEs, 12 zones,
+25 boundary UEs (50 %), 19 of the 25 APs on a registered mast.
 
 The seed is chosen for legibility — compact zones, none of them holding a
 single UE, boundary links that can be traced. To keep that presentation choice
 from turning into a quality one, the caption reports where this instance's
-utility ratio falls among the candidates: 99.5 % against a candidate mean of
-99.3 % and a spread of 97.7–99.8 % over the 14 of 16 seeds that have a
+utility ratio falls among the candidates: 99.1 % against a candidate mean of
+99.0 % and a spread of 97.2–100 % over the 14 of 16 seeds that have a
 centralized optimum. `preview_seeds.py` renders the candidates side by side
 and prints the numbers behind the choice.
 
@@ -280,8 +314,8 @@ and prints the numbers behind the choice.
 - **basemap**: the campus in its own colours, blended 38 % to white. It is
   context, not a model quantity — but it is the reason the APs sit where they
   do: each carries an equal share of the ground `ue_allowed_mask` permits and
-  stands on ground `ap_allowed_mask` permits, so no AP is out on the hillside
-  and none of them is grey. What keeps the map from swallowing the model is
+  then, where one is in reach, stands on a base station that is really there —
+  so no AP is out on the hillside. What keeps the map from swallowing the model is
   not a heavier wash but the white stroke under every marker and outline.
 
   `panels/snapshot_a_partition_muted_basemap.*` is the same panel with the map
@@ -344,9 +378,9 @@ not by eye. For every zone, `strongest_pair` takes each pair of its boundary
 UEs, forms the empirical joint over that pair and the outer product of the two
 marginals, and scores the pair by the total-variation distance between them;
 the zone keeps its worst pair, and the row shows the two worst zones. In the
-displayed instance that ranking runs TV = 0.38 (Z4), 0.34 (Z3), 0.34 (Z1),
-0.34, 0.32 … down to exactly 0.00 in the zones whose owned limits do not
-couple their boundary UEs — the dependence appears precisely where the
+displayed instance that ranking runs TV = 0.39 (Z3), 0.38 (Z7), 0.38 (Z11),
+0.36, 0.34 … down to nearly 0.00 in the zones whose owned limits barely couple
+their boundary UEs — the dependence appears precisely where the
 constraints bind, which is why the panels are worth showing at all.
 
 The TV value is not printed on the panel: it selects what to show, and the

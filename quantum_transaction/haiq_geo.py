@@ -15,6 +15,9 @@ the same 1894x1489 pixel grid:
     fig/ue_allowed_mask.png   where a UE may stand: open ground only, so a
                               UE never appears inside a building
     fig/campus.png            the basemap the two masks were traced from
+    fig/real_bs.png           the registered base stations over the same
+                              ground, read back out of the picture by
+                              `bs_sites`
 
 **The region is the whole campus, and `g` sets how densely it is covered.**
 There is no scale constant to choose: the model's unit is one nominal AP
@@ -33,11 +36,13 @@ composite's left column.
 What changes in an instance built this way:
 
   * APs are placed to carry *equal shares* of the ground a UE may stand on,
-    not one per lattice cell, and are then snapped to a roof or lot they may
-    legally occupy.  A lattice would spend APs on the hillside, where they
+    not one per lattice cell, and are then snapped onto a base station that
+    is really there.  A lattice would spend APs on the hillside, where they
     cover nobody, while overloading the ones that landed on open ground; and
     equalising by centroid alone is not enough, so the share is imposed as a
-    capacity constraint (`_balanced_assign`).
+    capacity constraint (`_balanced_assign`).  About three quarters of the
+    APs land on a registered mast; the rest fall back to allowed ground,
+    mostly where the base-station screenshot does not reach.
   * UEs are drawn uniformly over that same allowed area rather than over the
     square, so they cluster along streets and courtyards.
 
@@ -67,6 +72,26 @@ FIG_DIR = os.path.join(_HERE, "fig")
 AP_MASK_FILE = "ap_allowed_mask.png"
 UE_MASK_FILE = "ue_allowed_mask.png"
 BASEMAP_FILE = "campus.png"
+BS_MAP_FILE = "real_bs.png"
+
+# real_bs.png is a screenshot of the registered-base-station map over the same
+# ground, at a different zoom and from a different map provider.  Both are
+# north-up, so one scale and one offset relate them:  campus_px = s*bs_px + d.
+# The fit is by landmark (the running track, the Korea University Road) and
+# checked by eye against `bs_overlay.png`; automatic registration does not work
+# here, and it is worth saying why rather than leaving someone to retry it --
+# campus.png is a 3D render with extruded buildings and real_bs.png is a flat
+# near-monochrome map, so the two share almost no pixel statistics (edge
+# correlation 0.04, mutual information 0.016 nats: both noise).  Residual at
+# the landmark is about 15 px, a twentieth of an AP spacing at g=5.
+BS_TO_CAMPUS = (1.027, 219.0, 108.0)
+BS_MERGE_PX = 18.0          # several operators register masts at one site
+BS_SNAP_MAX = 0.70          # units: how far an AP may reach for a real mast
+# 0.70 is a trade, and both ends of it are measured.  Reaching further puts
+# more APs on real masts (68% at 0.45, 77% here, 83% at 1.0) and costs the
+# balancing that put them where the demand is (share spread cv 0.23, 0.28,
+# 0.36) -- and 0.40 is the unbalanced Lloyd this was built to beat.
+BS_CACHE = "bs_sites.npy"   # extraction takes seconds; the result never changes
 
 AP_SNAP_MAX = 0.55          # units: give up on a cell with nothing nearer
 AP_MIN_SEP = 0.35           # units: two APs may not share one rooftop
@@ -181,6 +206,93 @@ def _allowed_xy(kind, win, stride):
     return _cache[key]
 
 
+def bs_sites():
+    """The registered base-station masts, in campus pixel coordinates.
+
+    The source is a screenshot, so the positions have to be read back off the
+    picture.  Every mast is one teardrop pin of a fixed size, which makes this
+    template matching rather than blob finding -- pins overlap constantly, and
+    a blob of blue is as often four masts as one.  Matching alone still misses
+    the ones underneath, so a matched pin is erased from the working image and
+    the match is run again, until a pass finds nothing: that lifts the count
+    from 78 to 135 on this map.  A pin marks its site with its lower tip, not
+    its centre, so the anchor sits `tip` below the match.
+
+    Masts within `BS_MERGE_PX` are then merged.  Operators register per
+    carrier and per band, so one rooftop can carry four pins; 135 detections
+    are 120 distinct sites.
+
+    Result is cached to `BS_CACHE` -- delete it to re-extract.
+    """
+    path = os.path.join(_HERE, BS_CACHE)
+    if "bs" not in _cache:
+        if os.path.exists(path):
+            _cache["bs"] = np.load(path)
+        else:
+            _cache["bs"] = _extract_bs()
+            np.save(path, _cache["bs"])
+    return _cache["bs"]
+
+
+def _extract_bs():
+    """Read the pins out of `BS_MAP_FILE`; see `bs_sites` for the why."""
+    from scipy import ndimage as ndi
+    from scipy.signal import fftconvolve
+    from scipy.cluster.hierarchy import fcluster, linkage
+
+    img = _load(BS_MAP_FILE)[..., :3].astype(int)
+    r, g, b = img[..., 0], img[..., 1], img[..., 2]
+    pin = ndi.binary_fill_holes(ndi.binary_closing(
+        (b > 120) & (b - r > 50) & (b - g > 25), np.ones((3, 3))))
+
+    lab, _ = ndi.label(pin)                      # one un-overlapped pin, to
+    size = np.bincount(lab.ravel())[1:]          # measure the shape from
+    alone = int(np.argmin(np.where((size > 900) & (size < 1400),
+                                   size, 1 << 30))) + 1
+    ys, xs = np.where(lab == alone)
+    tpl = pin[max(ys.min() - 2, 0):ys.max() + 3,
+              max(xs.min() - 2, 0):xs.max() + 3].astype(float)
+    th, tw = tpl.shape
+    ker = tpl - tpl.mean()
+    norm = float((tpl * ker).sum())
+    tip = int(np.where(tpl.any(axis=1))[0].max()) - th // 2
+
+    work = pin.astype(float)
+    hits = []
+    while True:
+        score = fftconvolve(work, ker[::-1, ::-1], mode="same") / norm
+        found = 0
+        while True:
+            i = int(np.argmax(score))
+            if score.flat[i] < 0.50:
+                break
+            y, x = divmod(i, score.shape[1])
+            hits.append((x, y + tip))
+            found += 1
+            score[max(y - 13, 0):y + 14, max(x - 13, 0):x + 14] = -9.0
+            y0, y1 = max(y - th // 2, 0), min(y - th // 2 + th, work.shape[0])
+            x0, x1 = max(x - tw // 2, 0), min(x - tw // 2 + tw, work.shape[1])
+            work[y0:y1, x0:x1] = np.minimum(work[y0:y1, x0:x1],
+                                            1 - tpl[:y1 - y0, :x1 - x0])
+        if found == 0:
+            break
+
+    s, dx, dy = BS_TO_CAMPUS
+    xy = np.array(hits, dtype=float) * s + np.array([dx, dy])
+    group = fcluster(linkage(xy, "single"), t=BS_MERGE_PX, criterion="distance")
+    return np.array([xy[group == k].mean(axis=0) for k in np.unique(group)])
+
+
+def bs_sites_units(win):
+    """The masts in model units, and only the ones inside the region."""
+    px = bs_sites()
+    x, y = win.to_world(px[:, 0], px[:, 1])
+    xy = np.stack([x, y], axis=1)
+    keep = ((xy[:, 0] >= 0) & (xy[:, 0] <= win.g) &
+            (xy[:, 1] >= 0) & (xy[:, 1] <= win.g))
+    return xy[keep]
+
+
 def _balanced_assign(d2, cap):
     """Give every AP the same amount of ground, nearest ground first.
 
@@ -254,20 +366,49 @@ def place_aps(rng, g, win, jitter=0.18, iters=8):
             if mine.any():
                 ap[k] = demand[mine].mean(axis=0)
 
-    # distance to the nearest AP placed so far, carried forward rather than
-    # recomputed: the candidate list runs to six figures at the finer scales,
-    # and the all-pairs form allocated a matrix that size once per AP.
-    nearest = np.full(len(cand), np.inf)
-    placed = []
-    for p in ap:
-        d = np.linalg.norm(cand - p, axis=1)
-        ok = (d <= AP_SNAP_MAX) & (nearest >= AP_MIN_SEP)
-        if not ok.any():
-            continue
-        pick = cand[np.argmin(np.where(ok, d, np.inf))]
+    # Where the balancing wants an AP, put it on a mast that is really there.
+    # The registered sites outnumber the APs about five to one, so asking each
+    # AP for the nearest unused one costs the deployment very little and buys
+    # it every position from the real map.  Where the screenshot has no mast
+    # in reach -- it stops short of the bottom of the region, and it is a
+    # screenshot, not a survey -- the allowed-ground snap takes over, and
+    # `on_real_mast` says which APs ended up on which.
+    sites = bs_sites_units(win)
+    free = np.ones(len(sites), bool)
+
+    nearest = np.full(len(cand), np.inf)   # distance to the nearest AP placed
+    placed = []                            # so far, carried forward rather
+    for p in ap:                           # than recomputed: the candidate
+        pick = None                        # list runs to six figures.
+        if len(sites):
+            d = np.linalg.norm(sites - p, axis=1)
+            ok = free & (d <= BS_SNAP_MAX)
+            if placed:
+                sep = np.linalg.norm(sites[:, None, :] - np.array(placed)[None],
+                                     axis=2).min(axis=1)
+                ok &= sep >= AP_MIN_SEP
+            if ok.any():
+                j = int(np.argmin(np.where(ok, d, np.inf)))
+                free[j] = False
+                pick = sites[j]
+        if pick is None:
+            d = np.linalg.norm(cand - p, axis=1)
+            ok = (d <= AP_SNAP_MAX) & (nearest >= AP_MIN_SEP)
+            if not ok.any():
+                continue
+            pick = cand[np.argmin(np.where(ok, d, np.inf))]
         placed.append(pick)
         nearest = np.minimum(nearest, np.linalg.norm(cand - pick, axis=1))
     return np.array(placed, dtype=float).reshape(-1, 2)
+
+
+def on_real_mast(ap_xy, win, tol=1e-6):
+    """Which of `ap_xy` sit on a registered mast rather than a fallback."""
+    sites = bs_sites_units(win)
+    if len(sites) == 0:
+        return np.zeros(len(ap_xy), bool)
+    d = np.linalg.norm(ap_xy[:, None, :] - sites[None], axis=2).min(axis=1)
+    return d <= tol
 
 
 def place_ues(rng, n, win):
@@ -340,6 +481,28 @@ def coverage(g=5):
                 rooftop_only=float((ap & ~ue).mean()))
 
 
+def write_overlay(path=None, g=5):
+    """Draw the extracted masts on the campus, so the fit can be checked.
+
+    The alignment cannot be scored automatically -- see `BS_TO_CAMPUS` -- so
+    it has to be checkable by eye, and a claim nobody can check is worse than
+    no claim.  This is that check, written next to the rasters it relates.
+    """
+    from PIL import Image, ImageDraw
+    win = window_for(g)
+    img = Image.fromarray(_load(BASEMAP_FILE)[..., :3]).convert("RGB")
+    d = ImageDraw.Draw(img)
+    r0 = win.row1 - win.side_px
+    d.rectangle([win.col0, r0, win.col0 + win.side_px, r0 + win.side_px],
+                outline=(31, 111, 180), width=5)
+    for x, y in bs_sites():
+        d.ellipse([x - 7, y - 7, x + 7, y + 7], fill=(214, 39, 40),
+                  outline=(255, 255, 255), width=2)
+    path = path or os.path.join(FIG_DIR, "bs_overlay.png")
+    img.save(path)
+    return path
+
+
 if __name__ == "__main__":
     h, w = shape_px()
     print(f"rasters {w} x {h} px")
@@ -351,3 +514,7 @@ if __name__ == "__main__":
     c = coverage(5)
     print(f"  allowed inside the region: AP {c['ap_allowed']:.2f}, "
           f"UE {c['ue_allowed']:.2f}, rooftop-only {c['rooftop_only']:.2f}")
+    win = window_for(5)
+    print(f"  registered masts in the region: {len(bs_sites_units(win))} "
+          f"({len(bs_sites_units(win)) / 25:.1f} per AP)")
+    print(f"  wrote {write_overlay()}")
