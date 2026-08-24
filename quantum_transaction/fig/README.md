@@ -27,12 +27,12 @@ Panels:
 |---|---|
 | `panels/snapshot_a_partition.*` | (a) the partition |
 | `panels/snapshot_a_partition_muted_basemap.*` | (a) again, campus pulled to grey — for a dense page |
-| `panels/snapshot_b1_zone_law_Z2.*` | (b1) zone Z2, 3 APs |
-| `panels/snapshot_b2_zone_law_Z1.*` | (b2) zone Z1, 3 APs |
-| `panels/snapshot_b3_zone_law_Z5.*` | (b3) zone Z5, 2 APs |
-| `panels/snapshot_b4_zone_law_Z7.*` | (b4) zone Z7, 1 AP |
-| `panels/snapshot_c1_joint_Z11_UE8_43.*` | (c1) joint vs. marginals, zone Z11 |
-| `panels/snapshot_c2_joint_Z6_UE25_39.*` | (c2) joint vs. marginals, zone Z6 |
+| `panels/snapshot_b1_zone_law_Z5.*` | (b1) zone Z5, 3 APs |
+| `panels/snapshot_b2_zone_law_Z2.*` | (b2) zone Z2, 2 APs |
+| `panels/snapshot_b3_zone_law_Z13.*` | (b3) zone Z13, 2 APs |
+| `panels/snapshot_b4_zone_law_Z10.*` | (b4) zone Z10, 1 AP |
+| `panels/snapshot_c1_joint_Z13_UE6_16.*` | (c1) joint vs. marginals, zone Z13 |
+| `panels/snapshot_c2_joint_Z0_UE30_38.*` | (c2) joint vs. marginals, zone Z0 |
 | `panels/snapshot_c3_ablation_joint_vs_marginals.*` | (c3) what dropping the joint list costs |
 | `panels/snapshot_d_decimation_order.*` | (d) order the boundary UEs were fixed |
 | `panels/scaling_a_circuit_cost.*` | (a) two-qubit gate count vs. zones |
@@ -62,7 +62,7 @@ Two caches hold the sweeps, since both take minutes to recompute:
 | cache | holds | force a recompute |
 |---|---|---|
 | `../scaling_data.npz` | the 40-instance growth sweep behind `fig_scaling` | `--recollect` |
-| `../ablation_data.npz` | the joint-vs-marginal comparison behind (c3): the 13 of 16 campus instances with a centralized optimum | delete the file |
+| `../ablation_data.npz` | the joint-vs-marginal comparison behind (c3): the 14 of 16 campus instances with a centralized optimum | delete the file |
 
 How many panels each row shows is set by `N_ZONE_PANELS` (4) and
 `N_BND_PANELS` (2) in `make_fig_snapshot.py`; the grid widths follow.
@@ -260,23 +260,24 @@ ground. The masts are read back out of the picture — each is one teardrop pin
 of a fixed size, so this is template matching, and since pins overlap
 constantly a matched pin is erased and the match re-run until a pass finds
 nothing (78 detections in one pass, 135 after erasing). Operators register per
-carrier and per band, so pins within 18 px are merged: **178 distinct masts**
-inside the region, about 7 per AP.
+carrier and per band, so pins within 18 px are merged: **104 distinct masts**
+inside the region, about 4 per AP.
 
 Placement then snaps each balanced AP onto the nearest unused mast within
-`BS_SNAP_MAX` = 0.70 units. **All 25 APs stand on a registered mast**, in the
-displayed instance and in every seed. `BS_SNAP_MAX` is a trade and both ends
-of it are measured — reaching further puts more APs on real masts (80 % at
-0.35, 94 % at 0.50, 100 % at 0.70) and costs the balancing that put them where
-the demand is (share spread cv 0.22, 0.24, 0.27, against 0.40 for the
-unbalanced Lloyd this was built to beat).
+`BS_SNAP_MAX` = 0.70 units. **24 of the 25 APs stand on a registered mast** in
+the displayed instance, 94 % across seeds; the rest fall back to allowed
+ground. Reaching further would put more APs on masts and give back the
+balancing that put them where the demand is, which is the trade `BS_SNAP_MAX`
+sets.
 
 **The alignment is by eye, and it cannot be anything else.** The two images
 are north-up, so a scale and an offset per axis relate them —
-`BS_TO_CAMPUS = (1.40, 1.10, 108.8, 91.2)`, anchored on the running track
-(centre (258, 108) on the source, (470, 210) on the campus). The two scales
-differ because the source crops the axes differently; one scale left the masts
-bunched into the left half of a map they cover the whole of.
+`BS_TO_CAMPUS = (2.50, 1.30, -335, 69.6)`. The `y` scale and the offsets
+started from the running track (centre (258, 108) on the source, (470, 210) on
+the campus) and were then set by looking at the overlay. The two scales differ
+by a lot because `real_bs.png` covers a wider strip of ground than it does a
+tall one, and the region is only the middle of it: 104 of the 181 masts read
+off the source fall inside the square, the rest outside it.
 
 Four automatic criteria were tried and every one failed, which is recorded so
 nobody spends the afternoon again:
@@ -311,14 +312,14 @@ above.
 
 ## 3. `fig_snapshot` — one region, opened up
 
-Instance `g=5, seed=0`, laid over the campus: 25 APs, 50 UEs, 12 zones,
-26 boundary UEs (52 %), every AP on a registered mast.
+Instance `g=5, seed=0`, laid over the campus: 25 APs, 50 UEs, 14 zones,
+23 boundary UEs (46 %), 24 of the 25 APs on a registered mast.
 
 The seed is chosen for legibility — compact zones, none of them holding a
 single UE, boundary links that can be traced. To keep that presentation choice
 from turning into a quality one, the caption reports where this instance's
-utility ratio falls among the candidates: 99.5 % against a candidate mean of
-99.0 % and a spread of 97.0–100 % over the 13 of 16 seeds that have a
+utility ratio falls among the candidates: 99.2 % against a candidate mean of
+99.2 % and a spread of 98.1–100 % over the 13 of 16 seeds that have a
 centralized optimum. `preview_seeds.py` renders the candidates side by side
 and prints the numbers behind the choice.
 
@@ -394,9 +395,9 @@ not by eye. For every zone, `strongest_pair` takes each pair of its boundary
 UEs, forms the empirical joint over that pair and the outer product of the two
 marginals, and scores the pair by the total-variation distance between them;
 the zone keeps its worst pair, and the row shows the two worst zones. In the
-displayed instance that ranking runs TV = 0.38 (Z11), 0.38 (Z6), 0.35 (Z7),
-0.33, 0.32 … down to nearly 0.00 in the zones whose owned limits barely couple
-their boundary UEs — the dependence appears precisely where the
+displayed instance that ranking runs TV = 0.38 (Z13), 0.38 (Z0), 0.37 (Z12),
+0.21, 0.07 … down to exactly 0.00 in the zones whose owned limits do not
+couple their boundary UEs — the dependence appears precisely where the
 constraints bind, which is why the panels are worth showing at all.
 
 The TV value is not printed on the panel: it selects what to show, and the
@@ -435,7 +436,7 @@ marginals versus no marginals; it is whether those marginals are re-taken
 from a list that has been conditioned on each commitment, or read once at the
 start and left alone. The joint list is what makes re-taking them possible.
 
-The mean gap is **+0.8 points** of utility, and 10 of 13 instances improve. That is worth reading against the
+The mean gap is **+1.2 points** of utility, and 13 of 14 instances improve. That is worth reading against the
 total decomposition loss: the distributed result sits about 1 point below the
 centralized optimum, so the joint list is worth roughly as much as the entire
 remaining gap. This is the measured version of the manuscript's statement that

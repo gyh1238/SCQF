@@ -40,9 +40,9 @@ What changes in an instance built this way:
     is really there.  A lattice would spend APs on the hillside, where they
     cover nobody, while overloading the ones that landed on open ground; and
     equalising by centroid alone is not enough, so the share is imposed as a
-    capacity constraint (`_balanced_assign`).  About three quarters of the
-    APs land on a registered mast; the rest fall back to allowed ground,
-    mostly where the base-station screenshot does not reach.
+    capacity constraint (`_balanced_assign`).  Almost every AP lands on a
+    registered mast; the few that cannot reach one fall back to allowed
+    ground.
   * UEs are drawn uniformly over that same allowed area rather than over the
     square, so they cluster along streets and courtyards.
 
@@ -103,10 +103,11 @@ BS_MAP_FILE = "real_bs.png"
 # which the mask excludes.
 #
 # So: change these numbers if the overlay looks wrong to you, and regenerate
-# `fig/bs_overlay.png` with `python haiq_geo.py` to see what you did.  Anchored
-# on the running track, whose centre reads (258, 108) on the source and
-# (470, 210) on the campus.
-BS_TO_CAMPUS = (1.40, 1.10, 108.8, 91.2)   # sx, sy, dx, dy
+# `fig/bs_overlay.png` with `python haiq_geo.py` to see what you did.  The `y`
+# scale and the offsets started from the running track, whose centre reads
+# (258, 108) on the source and (470, 210) on the campus, and were then set by
+# eye against the overlay -- which is the only instrument this fit has.
+BS_TO_CAMPUS = (2.50, 1.30, -335.0, 69.6)   # sx, sy, dx, dy
 BS_MERGE_PX = 18.0          # several operators register masts at one site
 BS_SNAP_MAX = 0.70          # units: how far an AP may reach for a real mast
 # 0.70 is a trade, and both ends of it are measured.  Reaching further puts
