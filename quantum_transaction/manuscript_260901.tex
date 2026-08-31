@@ -862,26 +862,34 @@ The evaluation instantiates \eqref{eq:general-assignment} for joint AP--RB assig
 
 APs sit on a jittered unit grid of side $g$, measured in AP spacings, with two UEs and four RBs per AP, a coverage radius of $1.2$ spacings, and at most two joint candidates per UE, so $|\mathcal{C}_i|\leq2$ and $\ell_i=1$. The limits are $W_r=1$, $W_a=4$, and $d_i=1$, and utilities decay with UE--AP distance with a per-RB perturbation. Only $g$ varies, holding density, candidate degree, and capacity profile fixed. Greedy region growing with single-AP boundary refinement partitions the AP co-coverage graph, minimizing $|\mathcal{B}|$ subject to the partition budget $G_z\leq2000$ for one oracle $\mathcal{O}_z$.
 
-The target common exponent is $\beta=1.5$, so $\lambda=\beta/\bar{u}$ with $\bar{u}$ the mean candidate utility. Each zone applies $k=1$ round in \eqref{eq:circuit-chain} and reports $K_z=200$ accepted joint samples, with re-sampling triggered when $\widetilde{K}_z<K_{\min}=25$. A report costs about $K_z/P_z(k)$ executions, with $P_z(k)\simeq(2k+1)^2\mu_z$ here, so one round gives roughly a ninefold reduction. The round count maximizing $P_z(k)$ ranges from about five for the sparsest zones to about $900$ for the most tightly constrained, motivating the practical choice $k=1$.
+The target common exponent is $\beta=1.5$, so $\lambda=\beta/\bar{u}$ with $\bar{u}$ the mean over UEs of the best utility a UE's candidate set offers, a property of the utility model rather than of an instance. Each zone applies $k=1$ round in \eqref{eq:circuit-chain} and reports $K_z=200$ accepted joint samples, with re-sampling triggered when $\widetilde{K}_z<K_{\min}=25$. A report costs about $K_z/P_z(k)$ executions. In the small-mass regime these zones occupy, $P_z(k)\simeq(2k+1)^2\mu_z$, so one round is worth up to a ninefold reduction and delivers about sixfold on the region of Fig.~\ref{fig:snapshot}. The round count maximizing $P_z(k)$ ranges from none for the sparsest zones, whose accepted mass is already large, to about $890$ for the most tightly constrained, motivating the practical choice $k=1$.
 
-% VERIFY(k=1): beta_z changes when k moves from 0 to 1, so re-read the
-% corresponding mu_z values before keeping "about five" and "about 900".
-
-To respect a per-zone budget of $10^4$ executions, zone $z$ runs at the largest exponent $\beta_z\leq\beta$ that meets the budget at $k=1$, and its samples are reconstructed at the common exponent using the reweighting in Appendix~\ref{app:reweighting}. Across zones, $\beta_z$ ranges from $0.31$ to $1.50$ and $\widetilde{K}_z$ stays at or above $118$ of $200$ retained samples.
-
-% VERIFY(k=1): 0.31 and 118. The k=0 draft had 0.08--1.50 and 73.
+To respect a per-zone budget of $10^4$ executions, zone $z$ runs at the largest exponent $\beta_z\leq\beta$ that meets the budget at $k=1$, and its samples are reconstructed at the common exponent using the reweighting in Appendix~\ref{app:reweighting}. Across zones, $\beta_z$ ranges from $0.38$ to $1.50$ and $\widetilde{K}_z$ stays at or above $88$ of $200$ retained samples.
 
 \subsection{Zone-local distributions, exactly and under noise}
 \label{subsec:eval_local_law}
 
-% VERIFY: 2.7e-15 asserts that the implemented rotation follows (19)-(20) exactly.  The rotation code released for [jang2025cqf] instead uses  w_norm = w / max_w ;  theta = arccos(sqrt(w_norm))  -- a LINEAR weight with a MISSING factor of 2 relative to (20).  On a two-UE example that weight leaves the ranking intact but its ratio to exp[lambda*J] varies by a factor of 10.5 across assignments, so it does not satisfy (15) and would not give a TVD anywhere near 1e-15.  Confirm the SCQF rotation code against (19)-(20) before submission; this number and the Appendix A-B ordering claim both depend on it.
-Six zones of at most seven UEs and 24 qubits admit statevector checks. The largest total-variation distance from $p_z(\bm z)\propto\exp[\lambda J_z(\bm z)]$ on $\mathcal{F}_z$ is $2.7\times10^{-15}$ with no accepted probability outside $\mathcal{F}_z$, so the rotations realize the weight \eqref{eq:composability} requires and the superflag admits exactly the feasible set.
+% CHECKED: the concern was real and is fixed.  qtg_inter/qtg_intra did ship
+% the linear rotation  theta = arccos(sqrt(u/u_max)).  `certify_rotation.py`
+% measures both forms on the same P_z: the linear weight sits at TVD 0.377 /
+% 0.205 from exp[lambda J] with the ratio law/exp[lambda J] spread over a
+% factor of 21.4 / 6.5, so it does not satisfy (15); the corrected
+% g = exp[-lambda(u_max - u)], theta = 2 arccos sqrt(g) gives TVD 1.9e-16 /
+% 1.3e-16 with spread 1.0000.  Both files now carry the corrected form.
+Under a cap of seven UEs and 24 qubits, five zones of the partition admit statevector checks, the largest reaching six UEs and 21 qubits. The largest total-variation distance from $p_z(\bm z)\propto\exp[\lambda J_z(\bm z)]$ on $\mathcal{F}_z$ is $2.75\times10^{-15}$ with no accepted probability outside $\mathcal{F}_z$, so the rotations realize the weight \eqref{eq:composability} requires and the superflag admits exactly the feasible set.
 
-% VERIFY(k=1): 52%, 0.094, 0.061.  Report the two TVDs as measured; they are two separate measurements at equal sample size, NOT an additive decomposition of the noisy figure.  0.061 must be the same run quoted in Sec. V-C.
-Under a device noise model, transpiled to its basis gates and coupling map with $10^4$ shots per zone, the accepted-branch mass falls to $52\%$ of its noise-free value and the distance from $p_z$ is $0.094$, against $0.061$ noise-free at the same $K_z=200$; both trace to the transpiled depth of the QFT accumulators and the superflag conjunction.
+% CHECKED: measured by `noise_run.py` on the inter-cell zone sampler at 10^4
+% shots.  The two TVDs are separate measurements at equal shot count, not an
+% additive decomposition.  Routing is reported as a gate count rather than
+% simulated: a 127-qubit device cannot be simulated, and a figure measured on
+% the routed circuit could not separate noisy gates from a sparse lattice.
+Two costs of a real device are separable and are reported separately. The coupling map is a gate count, not a simulation: transpiled to the basis gates of a calibrated $127$-qubit backend and routed onto its heavy-hex lattice, one zone circuit grows from $384$ to $969$ two-qubit gates, a factor of $2.5$, and its depth from $773$ to $2\,717$. The gates themselves are a simulation, run at all-to-all connectivity where the simulated width is the circuit's own. At the backend's median error rates and $10^4$ shots, the accepted-branch mass falls to $18\%$ of its noise-free value and the distance from $p_z$ is $0.134$, against $0.005$ noise-free at the same shot count; a sweep of the two-qubit error rate locates the transition between them, $10^{-3}$ still holding the distance at $0.016$ and $77\%$ of the accepted mass while $10^{-2}$ reproduces the calibrated device. Both costs trace to the depth of the QFT accumulators and the superflag conjunction, and they compound: the routed circuit carries $2.5$ times the gates the sweep is indexed by.
 
-% VERIFY(k=1): 12% and 29%.  The noise-free rate is not zero: an infeasible assignment can still show all utility qubits in |0>.
-Strict feasibility survives unchanged. The acceptance test of Section~\ref{sec:distribution} applies to the decoded assignment rather than the internal flags, so corrupted outcomes are discarded: the discard rate rises from $12\%$ to $29\%$, and no infeasible assignment entered any zone report. 
+% CHECKED: 33% -> 88% discard, and the infeasible-decode share 5.0% -> 12.3%.
+% Neither is zero without noise, as the earlier note said: an infeasible
+% assignment can show all its utility qubits in |0> and is then discarded by
+% the decoded-assignment test, which is exactly why nothing leaks.
+Strict feasibility survives unchanged. The acceptance test of Section~\ref{sec:distribution} applies to the decoded assignment rather than the internal flags, so a corrupted outcome is discarded whatever the flags did and no infeasible assignment can enter a zone report. What noise costs is executions: the discard rate rises from $33\%$ to $88\%$, and the share of shots that pass the utility-qubit test only to decode to an infeasible assignment rises from $5.0\%$ to $12.3\%$. Neither share is zero without noise, since an infeasible assignment can perfectly well leave every utility qubit in $\ket{0}$; the guarantee comes from the decoded-assignment test, not from the circuit having been perfect. 
 
 Since \eqref{eq:op-prep} is a product over UEs before screening and $k$ enters only through $P_z(k)$, independent per-UE utility-weighted sampling followed by feasibility screening induces the same accepted-branch law; the experiments below use this exact sampler and account execution cost separately.
 
@@ -899,17 +907,15 @@ Since \eqref{eq:op-prep} is a product over UEs before screening and $k$ enters o
 \subsection{One partitioned region}
 \label{subsec:eval_snapshot}
 
-% CHECKED: 16 seeds -> 14 feasible -> statistics over all 14, of which re-conditioning wins on 13.  Consistent with the panel annotation "+1.2 pp on average, 13 of 14 cases".  No 13-feasible-seed reading remains anywhere in the section.
-% VERIFY(k=1): 0.061 -- must be the same run quoted in Sec. V-B.
-Fig.~\ref{fig:snapshot} follows one campus instance of $M=25$ APs and $N=50$ UEs. It is drawn from a family of 16 seeds on the same map, 14 of which are globally feasible, and the statistics below are over those 14. Throughout, $J^{\star}$ is the centralized strict optimum from HiGHS. The partition gives $|\mathcal{Z}|=14$ zones within budget and $|\mathcal{B}|=23$ boundary UEs, so $46\%$ of the UEs require coordination, and the four displayed zone distributions match their exact accepted laws to $0.061$ with no mass outside $\mathcal{F}_z$ despite differing $\beta_z$.
+Fig.~\ref{fig:snapshot} follows one campus instance of $M=25$ APs and $N=50$ UEs. It is drawn from a family of 16 seeds on the same map, 13 of which are globally feasible and supply the peer spread quoted below; the ablation of Fig.~\ref{fig:snapshot}(c3) uses a separate family of 16 instances spanning $g=4$ to $g=7$, of which 14 are feasible. Throughout, $J^{\star}$ is the centralized strict optimum from HiGHS. The partition gives $|\mathcal{Z}|=14$ zones within budget and $|\mathcal{B}|=23$ boundary UEs, so $46\%$ of the UEs require coordination, and the four displayed zone distributions match their exact accepted laws to $0.184$ at $K_z=200$ draws, with no mass outside $\mathcal{F}_z$ despite differing $\beta_z$.
 
-% VERIFY(k=1): 19% and 23%; read both off the rendered panels.  18% = extra executions from the 5 re-samples / total executions for the region, using the pinned-preparation acceptance mass rather than the original mu_z.
-On the two most dependent boundary-UE pairs the product of the marginals places $19\%$ and $23\%$ of its belief on joint choices that violate a capacity condition in $\mathcal{M}_z$ and that no sample in $\mathcal{S}_z$ realizes. Against a one-pass baseline identical in sampling and commitment rule, re-conditioning wins on 13 of the 14 instances by $1.2$ percentage points of $J^{\star}$. Five re-samples add $18\%$ to the region's execution count. The result satisfies every capacity and consistency condition and reaches $99.2\%$ of $J^{\star}$, the family mean, inside the observed $98.1$--$100\%$ range.
+On the two most dependent boundary-UE pairs the product of the marginals places $19\%$ of its belief on joint choices that violate a capacity condition in $\mathcal{M}_z$ and that no sample in $\mathcal{S}_z$ realizes. Against a one-pass baseline identical in sampling and commitment rule, re-conditioning wins on 11 of the 14 ablation instances by $0.9$ percentage points of $J^{\star}$. Five re-samples add $62\%$ to the region's execution count. The result satisfies every capacity and consistency condition and reaches $98.7\%$ of $J^{\star}$, inside the $97.3$--$100.0\%$ spread of its peers, whose mean is $99.2\%$.
 
 % ---------------------------------------------------------------
 %  FIGURE 9 -- single column, top of the page carrying Sec. V-D.
-%  ARTWORK: rename the y-axis to "Modeled logical latency (s)" so that
-%  the axis, the caption, and the body all use one name for tau_z.
+%  ARTWORK DONE: the y-axis now reads "Modeled logical latency (s)", so the
+%  axis and the body use one name for tau_z; the caption names the concept
+%  rather than the quantity, which is consistent with Figs. 8 and 10.
 % ---------------------------------------------------------------
 \begin{figure}[!t]
     \centering
@@ -931,12 +937,12 @@ For zone $z$, let $D_z=\sum_{i\in\mathcal{U}_z}|\mathcal{C}_i|$ denote the numbe
 \end{equation}
 Under bounded candidate degree and fixed counter width, both terms grow linearly with the zone size. Extra counters parallelize only the accumulation term, so adding counters has a floor.
 
-% VERIFY: confirm from the plotting script that |M_z| = N_z is what was actually used.
+% CHECKED: |M_z| = N_z, from CAPACITY_CONDITIONS_PER_UE = 1.0 in the plotting script.
 Fig.~\ref{fig:zone_crossover} sets $D_z=2N_z$, $\ell_{\mathrm{cnt},z}=3$, and $|\mathcal{M}_z|=N_z$ for all quantum curves. Depths convert to logical latency as $\tau_z=T_z t_{\mathrm{layer}}$ with $t_{\mathrm{layer}}=12.5$~ns, and the enhanced schedule uses $R_{\mathrm{cnt}}=4$ parallel counters. Each method is charged one local pass, excluding repeated search rounds, accepted-draw repetitions, readout, queueing, and boundary coordination.
 
 % VERIFY: confirm the 0.058--0.740 range in [jang2025cqf].
-% CHECKED: confirm the 2700-gate extrapolation against the fitted G_z curve.
-The classical reference is $\rho N_z^3$~ns with $\rho=0.400$, inside the $0.058$--$0.740$ range measured for the Hungarian method in~\cite{jang2025cqf}. It favors the classical side because that method omits the capacity constraints evaluated here. Crossovers occur at $N_z=17.7$ for the enhanced schedule, $31.1$ for the serial schedule, $36.5$ for GAS, and $42.1$ for QTG. The current partition produces zones of $1$--$13$ UEs; extending the largest measured circuit to $N_z\approx18$ requires about $2\,700$ gates, or $35\%$ above the current $2000$-gate budget.
+% CHECKED: the fit gives G_z = 190.5 N_z + 94.5, hence 3524 gates at N_z = 18.
+The classical reference is $\rho N_z^3$~ns with $\rho=0.400$, inside the $0.058$--$0.740$ range measured for the Hungarian method in~\cite{jang2025cqf}. It favors the classical side because that method omits the capacity constraints evaluated here. Crossovers occur at $N_z=17.7$ for the enhanced schedule, $31.1$ for the serial schedule, $36.5$ for GAS, and $42.1$ for QTG. The current partition produces zones of $1$--$13$ UEs, the largest measured circuit costing $1\,906$ gates; the fitted $G_z$ curve reaches $N_z\approx18$ at about $3\,500$ gates, or $76\%$ above the current $2000$-gate budget.
 
 % ---------------------------------------------------------------
 %  FIGURE 10 -- single column, top of the page carrying Sec. V-E.
@@ -953,14 +959,11 @@ The classical reference is $\rho N_z^3$~ns with $\rho=0.400$, inside the $0.058$
 
 The region side is varied over $g=3,\ldots,9$ with six seeds per size; two of the 42 instances are globally infeasible and dropped, and the remaining 40 span $N=18$ to $N=162$ UEs and $|\mathcal{Z}|=5.3$ to $45.0$ zones on average, so the network grows ninefold at fixed local density. A centralized circuit for the whole region grows from $10\,801$ to $173\,983$ two-qubit gates, a factor of 16, while the largest zone circuit grows from $1\,693$ to $1\,950$, a factor of $1.15$, never leaving the partition budget: the hardware requirement follows deployment density rather than region size.
 
-For zone $z$ with $n_z^{\mathrm{re}}$ re-samples, coordination traffic is modeled as $(1+n_z^{\mathrm{re}})K_z\bigl(\sum_{i\in\mathcal{B}_z}\lceil\log_2|\mathcal{C}_i|\rceil+32\bigr)$ bits, where the 32-bit field carries $J_z$ for the reconstruction of Appendix~\ref{app:reweighting}; the plotted values are converted to kilobytes. Regional traffic grows by $8.8\times$ as the zone count grows by $8.4\times$, so the mean report per zone increases by only $5\%$ and the per-zone load remains nearly unchanged as the region expands.
+For zone $z$ with $n_z^{\mathrm{re}}$ re-samples, coordination traffic is modeled as $(1+n_z^{\mathrm{re}})K_z\bigl(\sum_{i\in\mathcal{B}_z}\lceil\log_2|\mathcal{C}_i|\rceil+32\bigr)$ bits, where the 32-bit field carries $J_z$ for the reconstruction of Appendix~\ref{app:reweighting}; the plotted values are converted to kilobytes. Regional traffic grows by $9.0\times$ as the zone count grows by $8.4\times$, so the mean report per zone increases by only $6\%$ and the per-zone load remains nearly unchanged as the region expands.
 
-Coordinated utility stays between $98.81\%$ and $99.87\%$ of $J^{\star}$ with no downward trend, and all 40 runs finish globally feasible, so \eqref{eq:factorization} holds. Decomposition, finite sampling, and commitment cost about one percentage point, which does not accumulate over the evaluated range.
+Averaged over the seeds at each region size, coordinated utility stays between $98.76\%$ and $99.32\%$ of $J^{\star}$ with no downward trend, and spans $96.79$--$100\%$ over the individual runs; all 40 finish globally feasible, so \eqref{eq:factorization} holds. Decomposition, finite sampling, and commitment cost about one percentage point, which does not accumulate over the evaluated range.
 
-% VERIFY(k=1): every figure in the paragraph below. They are the k=0 values
-% (10^6--10^8, 2.6e8, 26,000) divided by nine. Regenerate rather than rescale:
-% beta_z shifts with k, so the two utility percentages move too.
-The exponent backoff keeps sampling affordable. On a separate 16-instance comparison, the most tightly constrained zones need $10^5$ to $3\times10^7$ executions at the target exponent with $k=1$; capping each zone at $10^4$ cuts the peak single-zone requirement from $2.9\times10^7$ to $10^4$, a factor of about $2\,900$, while mean utility moves from $99.31\%$ to $99.28\%$ of $J^{\star}$, a loss of $0.03$ percentage points on average and $0.55$ at worst. Reconstruction is unbiased, so the cap trades effective sample size for execution cost rather than systematic bias.
+The exponent backoff keeps sampling affordable. On a separate 16-instance comparison covering 281 zones, reporting at the target exponent with $k=1$ costs between $1.4\times10^3$ and $2.8\times10^7$ executions depending on how tightly the zone is constrained; capping each zone at $10^4$ cuts the peak single-zone requirement by a factor of about $2\,800$, while mean utility is unchanged at $99.19\%$ of $J^{\star}$ and the largest single-instance loss is $0.74$ percentage points. Reconstruction is unbiased, so the cap trades effective sample size for execution cost rather than systematic bias.
 }
 
 % =====================================================================

@@ -287,7 +287,7 @@ def draw(output_dir: Path) -> tuple[Path, Path]:
 
     ax.set_title("Zone-local classical–quantum crossover")
     ax.set_xlabel(r"Zone size $N_z$ (UEs)")
-    ax.set_ylabel("Modeled runtime (s)")
+    ax.set_ylabel("Modeled logical latency (s)")
 
     top_axis = ax.secondary_xaxis(
         "top",

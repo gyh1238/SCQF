@@ -1,4 +1,4 @@
-# Scalability figures for `manuscript.tex`
+# Evaluation artifacts for `manuscript_260901.tex` (Sec. V)
 
 Two new figures, independent of Fig. 8 (which stays as the single-zone
 complexity model). These cover the multi-zone case: a snapshot of one
@@ -14,14 +14,31 @@ partitioned region, and the average behaviour as the region grows.
 ## Reproducing
 
 ```bash
-python haiq_certify.py          # statevector check of the zone law   (~2 min)
-python make_fig_scaling.py --recollect   # collect + plot              (~2 min)
-python make_fig_snapshot.py              # plot                        (~1 min)
+python certify_rotation.py               # V-B: does the released oracle realize Eq. (19)-(21)?
+python haiq_certify.py                   # V-B: statevector check of the zone law
+python noise_run.py                      # V-B: the same sampler on a calibrated device
+python make_fig_scaling.py --recollect    # V-E: collect + plot
+python make_fig_snapshot.py               # V-C: plot
+python backoff_study.py                  # V-E: execution budget vs utility
+python eval_numbers.py                   # every number Sec. V quotes, printed
 ```
 
 `make_fig_scaling.py` caches its sweep in `scaling_data.npz`; run without
-`--recollect` to re-plot from the cache. Requires numpy, scipy, matplotlib,
-qiskit (statevector only — no Aer, no networkx).
+`--recollect` to re-plot from the cache. `make_fig_snapshot.py` caches its
+ablation in `ablation_data.npz`; delete that file to recollect. Requires
+numpy, scipy, matplotlib, qiskit, qiskit-aer, and — for `noise_run.py` —
+qiskit-ibm-runtime for the calibrated fake backends.
+
+**Amplification rounds.** `haiq_zone.K_ROUNDS` is the `k` of Eq. (35) and is
+the single knob that sets what a report costs: a zone pays `K_z / P_z(k)`
+executions, so raising `k` relaxes the exponent backoff and lifts every
+`beta_z` and effective sample size with it. It is `1`, matching Sec. V-A.
+Changing it invalidates both caches.
+
+**Sec. V numbers.** Several sentences in Sec. V quote quantities no panel is
+annotated with. `eval_numbers.py` prints all of them from the same run that
+produced the figures, so a sentence can be checked against a printed line
+rather than read off an axis.
 
 ## Modules
 
@@ -34,6 +51,13 @@ qiskit (statevector only — no Aer, no networkx).
 | `haiq_protocol.py` | reconstruction to the common exponent, belief product over boundary marginals, confidence-ordered decimation. |
 | `haiq_reference.py` | centralized strict optimum (MILP, HiGHS) — the denominator, not a competing protocol. |
 | `haiq_certify.py` | Qiskit statevector check that the sampler is the circuit's accepted branch. |
+| `qtg_inter_assignment.py` | **the paper's inter-cell circuit**: 1 bit/UE, QFT rate accumulator, `IntegerComparator`, one superflag. `build_sampler` assembles Eq. (26)-(36); `build_circuit` keeps the older Grover demo. |
+| `qtg_intra_assignment.py` | **the paper's intra-cell circuit**: 2 bits/node, QFT occupancy counter, validity flags, one superflag. Same two entry points. |
+| `hybrid_assignment_example.py` | the five-step decompose / solve / exchange / reconcile / benchmark walkthrough. |
+| `certify_rotation.py` | does the accepted branch follow `exp[lambda J]`? Measures the corrected exponential rotation against the linear one the earlier oracle shipped. |
+| `noise_run.py` | the same sampler under a calibrated backend's noise model, transpiled to its basis **and coupling map**: acceptance, distance to the exact law, discard rate, and measured leak. |
+| `backoff_study.py` | executions demanded at the target exponent, uncapped vs capped, and what the cap costs in utility. |
+| `eval_numbers.py` | every quantity Sec. V quotes, recomputed from the figures' own run. |
 
 ## Three things worth knowing before writing the text
 
