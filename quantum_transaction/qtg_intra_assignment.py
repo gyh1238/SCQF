@@ -23,8 +23,10 @@ Encoding    : 2 bits/node.  code 00->RB0, 01->RB1, 10->RB2, 11->invalid.
 Feasibility : (a) state-validity  -- no node holds the invalid code 11
               (b) RB-limit        -- occupancy(RB r) <= W_r  for every r
               With W_r = 1 and N = M = 3 the feasible set is the 6 permutations.
-Objective   : CQF-style phase rotation of link throughput into cost qubits;
-              superflag marks feasible AND high-throughput states.
+Objective   : exponential utility weight of Eq. (19)-(21) rotated into the
+              cost qubits, g = exp[-lambda(w_i^max - w_ir)], theta = 2 arccos sqrt(g),
+              so the accepted branch carries exp[lambda J] over the feasible
+              set, Eq. (30); superflag marks feasible AND cost all |0>.
 
 Qiskit 1.1 / 2.x compatible.
 
@@ -41,6 +43,9 @@ from qiskit.quantum_info import Statevector
 from qiskit_aer import AerSimulator
 
 INVALID_CODE = 3   # 11 -> no such RB
+
+# Target exponent of Sec. V-A; lambda = BETA / utility_scale(w).
+BETA = 1.5
 
 
 # ── QFT arithmetic primitives (shared with QTG/qtg_knapsack.py) ─────
@@ -102,21 +107,43 @@ def _mask_pair(qc, lsb, msb, r):
 
 # ── Oracle: objective phase (CQF throughput rotation, 2-bit) ───────
 
-def oracle_objective_phase(qc, assign, cost, match_anc, throughput, sign=+1):
+def utility_scale(throughput):
     """
-    Per-node per-RB throughput encoding (CQF identity, cf. intra_assignment.py):
-        theta = arccos(sqrt(R/R_max));  high throughput -> small theta -> cost |0>.
+    The utility model's scale `ubar`, so that `lambda = beta / ubar` is
+    dimensionless and one `beta` means the same thing in every zone.  Defined
+    from the model's dynamic range -- the mean of the per-node best throughput
+    -- rather than from an instance, as `haiq_instance.utility_scale`.
+    """
+    return float(np.mean(np.max(np.asarray(throughput, dtype=float), axis=1)))
+
+
+def oracle_objective_phase(qc, assign, cost, match_anc, throughput, lam, sign=+1):
+    """
+    Per-node per-RB throughput encoding, Eq. (19)-(21):
+
+        g_{i,r} = exp[-lambda (w_i^max - w_{i,r})],
+        theta_{i,r} = 2 arccos sqrt(g_{i,r}),
+
+    so the all-zero cost event of a complete assignment carries weight
+    kappa * exp[lambda J], Eq. (24).  Only an exponential weight turns the
+    additive utility of Eq. (13) into a product across zones, Eq. (15); the
+    linear form `arccos sqrt(w/w_max)` used by the enumeration oracle of
+    [jang2025cqf] preserves the per-node ranking but not that identity.
+
     A node holding the invalid code 11 matches no RB and leaves cost |0>; the
     state-validity flag (not the objective) is what rejects it.
     """
     N, M = throughput.shape
-    max_r = float(np.max(throughput))
     node_iter = range(N) if sign > 0 else reversed(range(N))
     for i in node_iter:
         lsb, msb = _pair(assign, i)
+        w_max = float(np.max(throughput[i]))
         rb_iter = range(M) if sign > 0 else reversed(range(M))
         for r in rb_iter:
-            theta = np.arccos(np.sqrt(np.clip(throughput[i, r] / max_r, 0.0, 1.0)))
+            g = np.exp(-lam * (w_max - throughput[i, r]))
+            theta = 2.0 * np.arccos(np.sqrt(np.clip(g, 0.0, 1.0)))
+            if theta == 0.0:       # best candidate: unit weight, no rotation
+                continue
             _mask_pair(qc, lsb, msb, r)
             qc.mcx([lsb, msb], match_anc)
             qc.cry(sign * theta, match_anc, cost[i])
@@ -182,9 +209,9 @@ def feasibility_flags(qc, assign, anc_state, rb_viol, cnt, match_anc, ge, anc_ic
 # ── Combined oracle ───────────────────────────────────────────────
 
 def apply_qtg_oracle(qc, assign, cost, anc_state, rb_viol, cnt, match_anc,
-                     ge, anc_ic, sf, throughput, N, M, W):
+                     ge, anc_ic, sf, throughput, N, M, W, lam):
     # (1) objective phase into cost
-    oracle_objective_phase(qc, assign, cost, match_anc, throughput, sign=+1)
+    oracle_objective_phase(qc, assign, cost, match_anc, throughput, lam, sign=+1)
     qc.barrier()
 
     # (2) constraint-violation flags (QTG occupancy counts)
@@ -203,7 +230,7 @@ def apply_qtg_oracle(qc, assign, cost, anc_state, rb_viol, cnt, match_anc,
     # (4) uncompute flags (self-inverse call) and objective phase
     feasibility_flags(qc, assign, anc_state, rb_viol, cnt, match_anc, ge, anc_ic,
                       N, M, W)
-    oracle_objective_phase(qc, assign, cost, match_anc, throughput, sign=-1)
+    oracle_objective_phase(qc, assign, cost, match_anc, throughput, lam, sign=-1)
     qc.barrier()
 
 
@@ -222,8 +249,10 @@ def apply_diffusion(qc, assign):
 
 # ── Full circuit builder ──────────────────────────────────────────
 
-def build_circuit(throughput, W=None, iterations=1):
+def build_circuit(throughput, W=None, iterations=1, beta=BETA, lam=None):
     throughput = np.asarray(throughput, dtype=float)
+    if lam is None:
+        lam = beta / utility_scale(throughput)
     N, M = throughput.shape
     assert M <= 3, "2-bit encoding supports up to 3 RBs (codes 00/01/10)"
     if W is None:
@@ -254,11 +283,103 @@ def build_circuit(throughput, W=None, iterations=1):
 
     for _ in range(iterations):
         apply_qtg_oracle(qc, assign, cost, anc_state, rb_viol, cnt, match_anc,
-                         ge[0], anc_ic, sf, throughput, N, M, W)
+                         ge[0], anc_ic, sf, throughput, N, M, W, lam)
         apply_diffusion(qc, assign)
 
     qc.measure(assign, cl)
     return qc
+
+
+# ── Sampler of Sec. IV-F (the circuit the evaluation measures) ────
+
+def build_sampler(throughput, W=None, k=1, beta=BETA, lam=None, measure=True):
+    """
+    The zone sampler of Eq. (26)-(36), as opposed to the Grover demo above.
+
+    `build_circuit` keeps the historical arrangement: the utility rotations
+    live inside the oracle and are mirrored away again, and the reflection is
+    the textbook one about the uniform state.  Section IV places them
+    differently:
+
+        P_z = Theta_z H^(x)Q_z                                   Eq. (26)
+        O_z = E_z^dagger Lambda_z E_z                            Eq. (32)
+        D_z = P_z (2|0><0| - I) P_z^dagger                       Eq. (33)
+        C_z = G_z^k P_z,   G_z = D_z O_z                         Eq. (35)
+
+    The rotations belong to preparation and stay standing through the
+    measurement, because the acceptance event of Sec. IV-F is *all utility
+    qubits in |0>*.  The reflection is then about P_z|0>, not about the
+    uniform state.
+
+    Returns (qc, meta) with the offsets a measurement needs to decode.
+    """
+    throughput = np.asarray(throughput, dtype=float)
+    if lam is None:
+        lam = beta / utility_scale(throughput)
+    N, M = throughput.shape
+    assert M <= 3, "2-bit encoding supports up to 3 RBs (codes 00/01/10)"
+    if W is None:
+        W = [1] * M
+
+    n_state = 2 * N
+    n_cnt = max(1, ceil(log2(N + 1)))
+    n_anc_ic = IntegerComparator(n_cnt, 1, geq=True).num_qubits - n_cnt - 1
+
+    assign    = QuantumRegister(n_state, "assign")
+    cost      = QuantumRegister(N, "cost")
+    anc_state = QuantumRegister(N, "anc_state")
+    rb_viol   = QuantumRegister(M, "rb_viol")
+    cnt       = QuantumRegister(n_cnt, "cnt")
+    match_anc = QuantumRegister(1, "match_anc")
+    ge        = QuantumRegister(1, "ge")
+    anc_ic    = QuantumRegister(max(1, n_anc_ic), "anc_ic")
+    sf        = QuantumRegister(1, "sf")
+    regs = [assign, cost, anc_state, rb_viol, cnt, match_anc, ge, anc_ic, sf]
+    if measure:
+        regs.append(ClassicalRegister(n_state + N, "c"))   # assign, then cost
+    qc = QuantumCircuit(*regs, name="CQF_Intra_Sampler")
+
+    def prep(inverse=False):
+        if inverse:
+            oracle_objective_phase(qc, assign, cost, match_anc[0], throughput,
+                                   lam, sign=-1)
+            qc.h(assign)
+        else:
+            qc.h(assign)
+            oracle_objective_phase(qc, assign, cost, match_anc[0], throughput,
+                                   lam, sign=+1)
+
+    def mark():
+        conds = list(cost) + list(anc_state) + list(rb_viol)
+        qc.x(conds)
+        qc.mcx(conds, sf[0])
+        qc.x(conds)
+
+    qc.x(sf); qc.h(sf)
+    prep()
+    qc.barrier()
+    for _ in range(k):
+        # O_z = E_z^dagger Lambda_z E_z; feasibility_flags is self-inverse
+        feasibility_flags(qc, assign, anc_state, rb_viol, cnt, match_anc[0],
+                          ge[0], anc_ic, N, M, W)
+        mark()
+        feasibility_flags(qc, assign, anc_state, rb_viol, cnt, match_anc[0],
+                          ge[0], anc_ic, N, M, W)
+        qc.barrier()
+        prep(inverse=True)                                # D_z
+        qc.x(list(assign) + list(cost))
+        qc.h(cost[-1])
+        qc.mcx(list(assign) + list(cost)[:-1], cost[-1])
+        qc.h(cost[-1])
+        qc.x(list(assign) + list(cost))
+        prep()
+        qc.barrier()
+    if measure:
+        qc.measure(list(assign) + list(cost), range(n_state + N))
+
+    meta = dict(n_assign=n_state, n_cost=N, lam=float(lam), k=int(k),
+                N=N, M=M, W=list(W))
+    return qc, meta
 
 
 # ── Classical reference ───────────────────────────────────────────

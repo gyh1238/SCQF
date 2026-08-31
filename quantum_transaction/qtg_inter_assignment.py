@@ -18,8 +18,10 @@ Feasibility : load(AP1) = sum_i w_i*assign[i],  load(AP0) = total_w - load(AP1).
                        <=>  (total_w - cap) <= S <= cap          (two-sided)
               With unit demands (w_i=1) and cap=Ua this reproduces the paper's
               access limit "each AP serves at most Ua UEs".
-Objective   : CQF-style phase rotation of link utility into cost qubits;
-              superflag marks feasible AND high-utility states (cost all |0>).
+Objective   : exponential utility weight of Eq. (19)-(21) rotated into the
+              cost qubits, g = exp[-lambda(u_i^max - u_ij)], theta = 2 arccos sqrt(g),
+              so the accepted branch carries exp[lambda J] over the feasible
+              set, Eq. (30); superflag marks feasible AND cost all |0>.
 
 Qiskit 1.1 / 2.x compatible.
 
@@ -34,6 +36,9 @@ from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
 from qiskit.circuit.library import IntegerComparator
 from qiskit.quantum_info import Statevector
 from qiskit_aer import AerSimulator
+
+# Target exponent of Sec. V-A; lambda = BETA / utility_scale(u).
+BETA = 1.5
 
 
 # ── QFT arithmetic primitives (shared with QTG/qtg_knapsack.py) ─────
@@ -114,18 +119,44 @@ def _feasibility_layout(weights, cap):
 
 # ── Oracle: objective phase (CQF link-utility rotation) ────────────
 
-def oracle_objective_phase(qc, assign, cost, utility, sign=+1):
+def utility_scale(utility):
     """
-    Per-UE per-AP utility encoding (CQF identity, cf. inter_assignment.py):
-        theta = arccos(sqrt(U/U_max));  high utility -> small theta -> cost |0>.
+    The utility model's scale `ubar`, so that `lambda = beta / ubar` is
+    dimensionless and one `beta` means the same thing in every zone.  Defined
+    from the model's dynamic range -- the mean of the per-UE best utility --
+    rather than from an instance, exactly as `haiq_instance.utility_scale`.
+    """
+    return float(np.mean(np.max(np.asarray(utility, dtype=float), axis=1)))
+
+
+def oracle_objective_phase(qc, assign, cost, utility, lam, sign=+1):
+    """
+    Per-UE per-AP utility encoding, Eq. (19)-(21):
+
+        g_{i,j} = exp[-lambda (u_i^max - u_{i,j})],
+        theta_{i,j} = 2 arccos sqrt(g_{i,j}),
+
+    so the all-zero cost event of a complete assignment carries weight
+    kappa * exp[lambda J], Eq. (24).  The exponent is what makes the weight
+    *composable*: only an exponential turns the additive utility of Eq. (13)
+    into a product across zones, Eq. (15), and Appendix A-A shows it is the
+    only continuous positive weight that does.
+
+    A linear weight -- `theta = arccos sqrt(u/u_max)`, as the enumeration
+    oracle of [jang2025cqf] used -- preserves the per-UE ranking but not that
+    identity, and its ratio to exp[lambda J] varies across assignments, so it
+    cannot support the zone composition of Sec. III-B.
+
     `sign=-1` applies the inverse rotation (uncompute).
     """
     N, M = utility.shape
-    max_u = float(np.max(utility))
     for i in range(N):
+        u_max = float(np.max(utility[i]))
         for j in range(M):
-            u_norm = utility[i, j] / max_u
-            theta = np.arccos(np.sqrt(np.clip(u_norm, 0.0, 1.0)))
+            g = np.exp(-lam * (u_max - utility[i, j]))
+            theta = 2.0 * np.arccos(np.sqrt(np.clip(g, 0.0, 1.0)))
+            if theta == 0.0:
+                continue
             if j == 0:
                 qc.x(assign[i])
             qc.cry(sign * theta, assign[i], cost[i])
@@ -136,7 +167,7 @@ def oracle_objective_phase(qc, assign, cost, utility, sign=+1):
 # ── QTG-style feasibility + CQF superflag marking ─────────────────
 
 def apply_qtg_oracle(qc, assign, cost, cap_reg, ge_hi, ge_lo, anc_ic, sf,
-                     weights, utility, lay):
+                     weights, utility, lay, lam):
     """
     One Grover oracle iteration:
       (1) CQF objective phase rotation into `cost`.
@@ -148,7 +179,7 @@ def apply_qtg_oracle(qc, assign, cost, cap_reg, ge_hi, ge_lo, anc_ic, sf,
     n_cap = lay["n_cap"]
 
     # (1) objective phase
-    oracle_objective_phase(qc, assign, cost, utility, sign=+1)
+    oracle_objective_phase(qc, assign, cost, utility, lam, sign=+1)
     qc.barrier()
 
     # (2) QTG weighted-sum accumulation:  S <- sum w_i on AP1
@@ -199,7 +230,7 @@ def apply_qtg_oracle(qc, assign, cost, cap_reg, ge_hi, ge_lo, anc_ic, sf,
     qc.barrier()
 
     # (5) uncompute objective phase
-    oracle_objective_phase(qc, assign, cost, utility, sign=-1)
+    oracle_objective_phase(qc, assign, cost, utility, lam, sign=-1)
     qc.barrier()
 
 
@@ -219,8 +250,10 @@ def apply_diffusion(qc, assign):
 
 # ── Full circuit builder ──────────────────────────────────────────
 
-def build_circuit(utility, weights, cap, iterations=1):
+def build_circuit(utility, weights, cap, iterations=1, beta=BETA, lam=None):
     utility = np.asarray(utility, dtype=float)
+    if lam is None:
+        lam = beta / utility_scale(utility)
     N, M = utility.shape
     assert M == 2, "binary (2-AP) inter-cell encoding"
     weights = [int(w) for w in weights]
@@ -246,11 +279,123 @@ def build_circuit(utility, weights, cap, iterations=1):
 
     for _ in range(iterations):
         apply_qtg_oracle(qc, assign, cost, cap_r, ge_hi[0], ge_lo[0], anc_ic, sf,
-                         weights, utility, lay)
+                         weights, utility, lay, lam)
         apply_diffusion(qc, assign)
 
     qc.measure(assign, cl)
+    lay["lam"] = float(lam)
     return qc, lay
+
+
+# ── Sampler of Sec. IV-F (the circuit the evaluation measures) ────
+
+def build_sampler(utility, weights, cap, k=1, beta=BETA, lam=None,
+                  measure=True):
+    """
+    The zone sampler of Eq. (26)-(36), as opposed to the Grover demo above.
+
+    `build_circuit` keeps the historical arrangement: the utility rotations
+    live inside the oracle and are mirrored away again, and the reflection is
+    the textbook one about the uniform state.  Section IV places them
+    differently, and the difference is not cosmetic:
+
+        P_z = Theta_z H^(x)Q_z                                   Eq. (26)
+        O_z = E_z^dagger Lambda_z E_z                            Eq. (32)
+        D_z = P_z (2|0><0| - I) P_z^dagger                       Eq. (33)
+        C_z = G_z^k P_z,   G_z = D_z O_z                         Eq. (35)
+
+    The rotations belong to preparation and stay standing through the
+    measurement, because the acceptance event of Sec. IV-F is *all utility
+    qubits in |0>* -- there is nothing to condition on once they are undone.
+    The reflection is then about P_z|0>, not about the uniform state, since
+    the utility qubits are already rotated at that point.
+
+    Returns (qc, meta).  `meta` carries the register offsets a measurement
+    needs to decode, plus lambda and the round count.
+    """
+    utility = np.asarray(utility, dtype=float)
+    if lam is None:
+        lam = beta / utility_scale(utility)
+    N, M = utility.shape
+    assert M == 2, "binary (2-AP) inter-cell encoding"
+    weights = [int(w) for w in weights]
+    lay = _feasibility_layout(weights, cap)
+
+    assign = QuantumRegister(N, "assign")
+    cost   = QuantumRegister(N, "cost")
+    cap_r  = QuantumRegister(lay["n_cap"], "cap")
+    ge_hi  = QuantumRegister(1, "ge_hi")
+    ge_lo  = QuantumRegister(1, "ge_lo")
+    anc_ic = QuantumRegister(max(1, lay["n_anc_ic"]), "anc_ic")
+    sf     = QuantumRegister(1, "sf")
+    regs = [assign, cost, cap_r, ge_hi, ge_lo, anc_ic, sf]
+    if measure:
+        regs.append(ClassicalRegister(2 * N, "c"))   # assign, then cost
+    qc = QuantumCircuit(*regs, name="CQF_Inter_Sampler")
+
+    def prep(inverse=False):
+        """P_z, or P_z^dagger when `inverse`."""
+        if inverse:
+            oracle_objective_phase(qc, assign, cost, utility, lam, sign=-1)
+            qc.h(assign)
+        else:
+            qc.h(assign)
+            oracle_objective_phase(qc, assign, cost, utility, lam, sign=+1)
+
+    def evaluate(inverse=False):
+        """E_z: the owned capacity conditions into ge_hi / ge_lo."""
+        cap_lsb = cap_r[::-1]
+        if not inverse:
+            for i in range(N):
+                controlled_add(qc, assign[i], cap_r, int(weights[i]))
+        if lay["need_hi"]:
+            c = IntegerComparator(lay["n_cap"], lay["hi_violation"], geq=True)
+            c = c.inverse() if inverse else c
+            qc.compose(c, cap_lsb + [ge_hi[0]] + list(anc_ic[:lay["n_anc_ic"]]),
+                       inplace=True)
+        if lay["need_lo"]:
+            c = IntegerComparator(lay["n_cap"], lay["lo_threshold"], geq=True)
+            c = c.inverse() if inverse else c
+            qc.compose(c, cap_lsb + [ge_lo[0]] + list(anc_ic[:lay["n_anc_ic"]]),
+                       inplace=True)
+        if inverse:
+            for i in reversed(range(N)):
+                controlled_sub(qc, assign[i], cap_r, int(weights[i]))
+
+    def mark():
+        """Lambda_z: one superflag conjunction over flags and utility qubits."""
+        controls = list(cost)
+        qc.x(cost)
+        if lay["need_hi"]:
+            qc.x(ge_hi[0])
+            controls = controls + [ge_hi[0]]
+        if lay["need_lo"]:
+            controls = controls + [ge_lo[0]]
+        qc.mcx(controls, sf[0])
+        if lay["need_hi"]:
+            qc.x(ge_hi[0])
+        qc.x(cost)
+
+    qc.x(sf); qc.h(sf)          # |-> so the superflag MCX is a phase mark
+    prep()
+    qc.barrier()
+    for _ in range(k):
+        evaluate();  mark();  evaluate(inverse=True)      # O_z
+        qc.barrier()
+        prep(inverse=True)                                # D_z
+        qc.x(list(assign) + list(cost))
+        qc.h(cost[-1])
+        qc.mcx(list(assign) + list(cost)[:-1], cost[-1])
+        qc.h(cost[-1])
+        qc.x(list(assign) + list(cost))
+        prep()
+        qc.barrier()
+    if measure:
+        qc.measure(list(assign) + list(cost), range(2 * N))
+
+    meta = dict(n_assign=N, n_cost=N, lam=float(lam), k=int(k), lay=lay,
+                weights=weights, cap=cap)
+    return qc, meta
 
 
 # ── Classical reference ───────────────────────────────────────────
