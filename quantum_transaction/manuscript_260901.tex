@@ -102,9 +102,7 @@ A distributed quantum architecture is developed to extend network-wide computati
 \end{itemize}
 These contributions establish an end-to-end computational framework that connects practical network optimization models to constraint-preserving, utility-aware quantum execution.
 
-
 The remainder of this paper is organized as follows. Section~\ref{sec:background} reviews related quantum optimization methods for assignment-based network management. Section~\ref{sec:formulation} presents the unified assignment model and its zone-based decomposition for scalable implementation. Section~\ref{sec:circuit} develops the quantum computation for constraint-preserving and utility-weighted assignment and the coordination of distributed quantum outputs. Section~\ref{sec:eval} presents the implementation and experimental evaluation, and Section~\ref{sec:conclusion} concludes the paper.
-
 
 % =====================================================================
 \section{Background and Related Work}
@@ -401,7 +399,7 @@ The unified formulation in \eqref{eq:general-assignment} defines a search space 
 \label{fig:superposition}
 \end{figure}
 
-As the assignment size increases, representing the entire search space within a single quantum computation becomes difficult under the limited computational resources of present-day NISQ processors. Thus, network-scale execution is addressed by dividing the unified assignment according to network zones. Each zone contains a subset of APs and the UEs with assignment candidates in that zone. Let $\mathcal{Z}$, $\mathcal{A}_z$, and $\mathcal{U}_z$ denote the set of zones, the APs in zone $z$, and the UEs included in zone $z$, respectively. UE $i$ is included in zone $z$ if at least one candidate in $\mathcal{C}_i$ is associated with an AP in $\mathcal{A}_z$. The set of zones containing UE $i$ is denoted by $\mathcal{Z}_i$. A UE with $|\mathcal{Z}_i|>1$ is defined as a boundary UE, i.e., a UE that belongs to two or more zones. The set of boundary UEs is denoted by $\mathcal{B}$. Each zone contains the assignment variables and capacity constraints associated with its local candidates. For a boundary UE $i$, the assignment in zone $z\in\mathcal{Z}_i$ is denoted by $\bm z_i^{(z)}$.
+As the assignment size increases, representing the entire search space within a single quantum computation becomes difficult under the limited computational resources of present-day NISQ processors. Thus, network-scale execution is addressed by dividing the unified assignment according to network zones. Each zone contains a subset of APs and the UEs with assignment candidates in that zone. Let $\mathcal{Z}$, $\mathcal{A}_z$, and $\mathcal{U}_z$ denote the set of zones, the APs in zone $z$, and the UEs included in zone $z$, respectively, and write $N_z=|\mathcal{U}_z|$ for the zone size. UE $i$ is included in zone $z$ if at least one candidate in $\mathcal{C}_i$ is associated with an AP in $\mathcal{A}_z$. The set of zones containing UE $i$ is denoted by $\mathcal{Z}_i$. A UE with $|\mathcal{Z}_i|>1$ is defined as a boundary UE, i.e., a UE that belongs to two or more zones. The set of boundary UEs is denoted by $\mathcal{B}$. Each zone contains the assignment variables and capacity constraints associated with its local candidates. For a boundary UE $i$, the assignment in zone $z\in\mathcal{Z}_i$ is denoted by $\bm z_i^{(z)}$.
 
 The feasible assignments within zone $z$ form the local feasible set
 $\mathcal{F}_z$. This set contains the assignments that satisfy the
@@ -556,7 +554,7 @@ g_{i,j}
 \right],
 \label{eq:utility-weight}
 \end{align}
-where $\lambda>0$ controls how strongly utility differences are reflected in the weights. This mapping gives $g_{i,j}=1$ for a
+where $\lambda>0$ controls how strongly utility differences are reflected in the weights. Since $\lambda$ multiplies a utility, its numerical value carries the inverse unit of $u_{i,j}$ and means nothing on its own. It is therefore written as $\lambda=\beta/\bar{u}$, with $\bar{u}$ the scale of the utility model and $\beta$ dimensionless, so that the single exponent every zone must share in \eqref{eq:composability} is a shared $\beta$ rather than a number that would differ with the units. This mapping gives $g_{i,j}=1$ for a
 highest-utility candidate and $0<g_{i,j}<1$ for candidates with lower utility. Furthermore, $g_{i,j}$ increases monotonically with $u_{i,j}$,
 and the ordering of the original utility values is preserved.
 The weight $g_{i,j}$ can now be represented by the measurement probability of the utility qubit. From \eqref{eq:utility-rotation}, the
@@ -852,51 +850,30 @@ satisfy their zone-level feasibility conditions, while resolved boundary assignm
 \section{Numerical Evaluation}
 \label{sec:eval}
 
-% VERIFY: the repository URL below currently returns 404 to an unauthenticated client.  Make it public before submission, or the artifact claim cannot be checked by a reviewer.
 This section verifies the zone-local distribution, measures it under noise, evaluates boundary coordination on a partitioned region, and characterizes scaling with network size. Implementation, generator, seeds, cached data, noise models, and plotting scripts are in the project repository.\footnote{\url{https://github.com/gyh1238/SCQF/tree/main/quantum_transaction}}
 
 \subsection{Setup}
 \label{subsec:eval_setup}
 
-The evaluation instantiates \eqref{eq:general-assignment} for joint AP--RB assignment. Each candidate $j=(a,r)\in\mathcal{C}_i$ loads two resources at once: the admission budget of AP $a$, with $c_{m,i,j}=d_i$ and $W_m=W_a$, and the occupancy of RB $r$, with $c_{m,i,j}=1$ and $W_m=W_r$. The oracle of Section~\ref{sec:oracle} evaluates both on the same assignment.
+The evaluation instantiates \eqref{eq:general-assignment} for joint AP--RB assignment. A candidate $j=(a,r)\in\mathcal{C}_i$ consumes two capacities at once, so the capacity constraint of \eqref{eq:general-assignment} is imposed once per resource rather than once per candidate: AP $a$ is loaded by the demand $d_i$ against its admission budget $W_a$, and RB $r$ by one unit against its occupancy limit $W_r$. The oracle of Section~\ref{sec:oracle} evaluates both on the same assignment.
 
-APs sit on a jittered unit grid of side $g$, measured in AP spacings, with two UEs and four RBs per AP, a coverage radius of $1.2$ spacings, and at most two joint candidates per UE, so $|\mathcal{C}_i|\leq2$ and $\ell_i=1$. The limits are $W_r=1$, $W_a=4$, and $d_i=1$, and utilities decay with UE--AP distance with a per-RB perturbation. Only $g$ varies, holding density, candidate degree, and capacity profile fixed. Greedy region growing with single-AP boundary refinement partitions the AP co-coverage graph, minimizing $|\mathcal{B}|$ subject to the partition budget $G_z\leq2000$ for one oracle $\mathcal{O}_z$.
+APs sit on a jittered unit grid of side $g$, measured in AP spacings, with two UEs and four RBs per AP, a coverage radius of $1.2$ spacings, and at most two joint candidates per UE, so $|\mathcal{C}_i|\leq2$ and $\ell_i=1$. The limits are $W_r=1$, $W_a=4$, and $d_i=1$, and utilities decay with UE--AP distance with a per-RB perturbation. Only $g$ varies, holding density, candidate degree, and capacity profile fixed. Greedy region growing with single-AP boundary refinement partitions the AP co-coverage graph, minimizing $|\mathcal{B}|$ subject to a budget of $2000$ two-qubit gates for one oracle $\mathcal{O}_z$.
 
-The target common exponent is $\beta=1.5$, so $\lambda=\beta/\bar{u}$ with $\bar{u}$ the mean over UEs of the best utility a UE's candidate set offers, a property of the utility model rather than of an instance. Each zone applies $k=1$ round in \eqref{eq:circuit-chain} and reports $K_z=200$ accepted joint samples, with re-sampling triggered when $\widetilde{K}_z<K_{\min}=25$. A report costs about $K_z/P_z(k)$ executions. In the small-mass regime these zones occupy, $P_z(k)\simeq(2k+1)^2\mu_z$, so one round is worth up to a ninefold reduction and delivers about sixfold on the region of Fig.~\ref{fig:snapshot}. The round count maximizing $P_z(k)$ ranges from none for the sparsest zones, whose accepted mass is already large, to about $890$ for the most tightly constrained, motivating the practical choice $k=1$.
+The target common exponent is $\beta=1.5$, so $\lambda=\beta/\bar{u}$ with $\bar{u}$ taken as the mean over UEs of the best utility their candidates offer. Each zone applies $k=1$ round in \eqref{eq:circuit-chain} and reports $K_z=200$ accepted joint samples, with re-sampling triggered when $\widetilde{K}_z<K_{\min}=25$. A report costs about $K_z/P_z(k)$ executions. In the small-mass regime these zones occupy, $P_z(k)\simeq(2k+1)^2\mu_z$, so one round is worth up to a ninefold reduction and delivers about sixfold on the region of Fig.~\ref{fig:snapshot}. The round count maximizing $P_z(k)$ ranges from none for the sparsest zones, whose accepted mass is already large, to about $890$ for the most tightly constrained, motivating the practical choice $k=1$.
 
-To respect a per-zone budget of $10^4$ executions, zone $z$ runs at the largest exponent $\beta_z\leq\beta$ that meets the budget at $k=1$, and its samples are reconstructed at the common exponent using the reweighting in Appendix~\ref{app:reweighting}. Across zones, $\beta_z$ ranges from $0.38$ to $1.50$ and $\widetilde{K}_z$ stays at or above $88$ of $200$ retained samples.
+To respect a per-zone budget of $10^4$ executions, zone $z$ runs at the largest exponent $\beta_z\leq\beta$ that meets the budget at $k=1$, and its samples are reconstructed at the common exponent using the reweighting in Appendix~\ref{app:reweighting}. Across zones, $\beta_z$ ranges from $0.38$ to $1.50$, and $\widetilde{K}_z$ --- the number of samples that survive the reweighting with useful weight --- stays at or above $88$ of the $200$ retained.
 
 \subsection{Zone-local distributions, exactly and under noise}
 \label{subsec:eval_local_law}
 
-% CHECKED: the concern was real and is fixed.  qtg_inter/qtg_intra did ship
-% the linear rotation  theta = arccos(sqrt(u/u_max)).  `certify_rotation.py`
-% measures both forms on the same P_z: the linear weight sits at TVD 0.377 /
-% 0.205 from exp[lambda J] with the ratio law/exp[lambda J] spread over a
-% factor of 21.4 / 6.5, so it does not satisfy (15); the corrected
-% g = exp[-lambda(u_max - u)], theta = 2 arccos sqrt(g) gives TVD 1.9e-16 /
-% 1.3e-16 with spread 1.0000.  Both files now carry the corrected form.
 Under a cap of seven UEs and 24 qubits, five zones of the partition admit statevector checks, the largest reaching six UEs and 21 qubits. The largest total-variation distance from $p_z(\bm z)\propto\exp[\lambda J_z(\bm z)]$ on $\mathcal{F}_z$ is $2.75\times10^{-15}$ with no accepted probability outside $\mathcal{F}_z$, so the rotations realize the weight \eqref{eq:composability} requires and the superflag admits exactly the feasible set.
 
-% CHECKED: measured by `noise_run.py` on the inter-cell zone sampler at 10^4
-% shots.  The two TVDs are separate measurements at equal shot count, not an
-% additive decomposition.  Routing is reported as a gate count rather than
-% simulated: a 127-qubit device cannot be simulated, and a figure measured on
-% the routed circuit could not separate noisy gates from a sparse lattice.
 Two costs of a real device are separable and are reported separately. The coupling map is a gate count, not a simulation: transpiled to the basis gates of a calibrated $127$-qubit backend and routed onto its heavy-hex lattice, one zone circuit grows from $384$ to $969$ two-qubit gates, a factor of $2.5$, and its depth from $773$ to $2\,717$. The gates themselves are a simulation, run at all-to-all connectivity where the simulated width is the circuit's own. At the backend's median error rates and $10^4$ shots, the accepted-branch mass falls to $18\%$ of its noise-free value and the distance from $p_z$ is $0.134$, against $0.005$ noise-free at the same shot count; a sweep of the two-qubit error rate locates the transition between them, $10^{-3}$ still holding the distance at $0.016$ and $77\%$ of the accepted mass while $10^{-2}$ reproduces the calibrated device. Both costs trace to the depth of the QFT accumulators and the superflag conjunction, and they compound: the routed circuit carries $2.5$ times the gates the sweep is indexed by.
 
-% CHECKED: 33% -> 88% discard, and the infeasible-decode share 5.0% -> 12.3%.
-% Neither is zero without noise, as the earlier note said: an infeasible
-% assignment can show all its utility qubits in |0> and is then discarded by
-% the decoded-assignment test, which is exactly why nothing leaks.
 Strict feasibility survives unchanged. The acceptance test of Section~\ref{sec:distribution} applies to the decoded assignment rather than the internal flags, so a corrupted outcome is discarded whatever the flags did and no infeasible assignment can enter a zone report. What noise costs is executions: the discard rate rises from $33\%$ to $88\%$, and the share of shots that pass the utility-qubit test only to decode to an infeasible assignment rises from $5.0\%$ to $12.3\%$. Neither share is zero without noise, since an infeasible assignment can perfectly well leave every utility qubit in $\ket{0}$; the guarantee comes from the decoded-assignment test, not from the circuit having been perfect. 
 
 Since \eqref{eq:op-prep} is a product over UEs before screening and $k$ enters only through $P_z(k)$, independent per-UE utility-weighted sampling followed by feasibility screening induces the same accepted-branch law; the experiments below use this exact sampler and account execution cost separately.
 
-% ---------------------------------------------------------------
-%  FIGURE 8 -- two-column float, declared at the end of Sec. V-B so
-%  that [!t] can place it atop the page on which Sec. V-C begins.
-% ---------------------------------------------------------------
 \begin{figure*}[!t]
     \centering
     \includegraphics[width=\textwidth]{fig/fig_snapshot}
@@ -909,14 +886,8 @@ Since \eqref{eq:op-prep} is a product over UEs before screening and $k$ enters o
 
 Fig.~\ref{fig:snapshot} follows one campus instance of $M=25$ APs and $N=50$ UEs. It is drawn from a family of 16 seeds on the same map, 13 of which are globally feasible and supply the peer spread quoted below; the ablation of Fig.~\ref{fig:snapshot}(c3) uses a separate family of 16 instances spanning $g=4$ to $g=7$, of which 14 are feasible. Throughout, $J^{\star}$ is the centralized strict optimum from HiGHS. The partition gives $|\mathcal{Z}|=14$ zones within budget and $|\mathcal{B}|=23$ boundary UEs, so $46\%$ of the UEs require coordination, and the four displayed zone distributions match their exact accepted laws to $0.184$ at $K_z=200$ draws, with no mass outside $\mathcal{F}_z$ despite differing $\beta_z$.
 
-On the two most dependent boundary-UE pairs the product of the marginals places $19\%$ of its belief on joint choices that violate a capacity condition in $\mathcal{M}_z$ and that no sample in $\mathcal{S}_z$ realizes. Against a one-pass baseline identical in sampling and commitment rule, re-conditioning wins on 11 of the 14 ablation instances by $0.9$ percentage points of $J^{\star}$. Five re-samples add $62\%$ to the region's execution count. The result satisfies every capacity and consistency condition and reaches $98.7\%$ of $J^{\star}$, inside the $97.3$--$100.0\%$ spread of its peers, whose mean is $99.2\%$.
+On the two most dependent boundary-UE pairs the product of the marginals places $19\%$ of its belief on joint choices that violate a capacity condition the zone owns and that no sample in $\mathcal{S}_z$ realizes. Against a one-pass baseline identical in sampling and commitment rule, re-conditioning wins on 11 of the 14 ablation instances by $0.9$ percentage points of $J^{\star}$. Five re-samples add $62\%$ to the region's execution count. The result satisfies every capacity and consistency condition and reaches $98.7\%$ of $J^{\star}$, inside the $97.3$--$100.0\%$ spread of its peers, whose mean is $99.2\%$.
 
-% ---------------------------------------------------------------
-%  FIGURE 9 -- single column, top of the page carrying Sec. V-D.
-%  ARTWORK DONE: the y-axis now reads "Modeled logical latency (s)", so the
-%  axis and the body use one name for tau_z; the caption names the concept
-%  rather than the quantity, which is consistent with Figs. 8 and 10.
-% ---------------------------------------------------------------
 \begin{figure}[!t]
     \centering
     \includegraphics[width=\columnwidth]{fig/fig8}
@@ -927,26 +898,20 @@ On the two most dependent boundary-UE pairs the product of the marginals places 
 \subsection{What one zone circuit costs}
 \label{subsec:eval_local_scaling}
 
-For zone $z$, let $D_z=\sum_{i\in\mathcal{U}_z}|\mathcal{C}_i|$ denote the number of evaluated candidate edges, $\ell_{\max,z}=\max_{i\in\mathcal{U}_z}\lceil\log_2|\mathcal{C}_i|\rceil$ the widest candidate code, and $\ell_{\mathrm{cnt},z}$ the load-counter width. With approximate-QFT arithmetic and standard multi-control decompositions, the modeled depth $T_z$ and two-qubit count $G_z$ of one oracle $\mathcal{O}_z$ scale as
+For zone $z$, let $D_z=\sum_{i\in\mathcal{U}_z}|\mathcal{C}_i|$ denote the number of evaluated candidate edges, $\ell_{\max,z}=\max_{i\in\mathcal{U}_z}\lceil\log_2|\mathcal{C}_i|\rceil$ the widest candidate code, $Q_z^{\mathrm{cnt}}$ the counter width of \eqref{eq:counter-width}, and $\mathcal{M}_z$ the capacity conditions the zone owns, one per AP and RB it holds. With approximate-QFT arithmetic and standard multi-control decompositions, the modeled depth $T_z$ and two-qubit count $G_z$ of one oracle $\mathcal{O}_z$ scale as
 \begin{equation}
     T_z,\;G_z=O\!\left(
-    D_z\left(\ell_{\max,z}+\ell_{\mathrm{cnt},z}\right)
-    +|\mathcal{M}_z|\,\ell_{\mathrm{cnt},z}
+    D_z\left(\ell_{\max,z}+Q_z^{\mathrm{cnt}}\right)
+    +|\mathcal{M}_z|\,Q_z^{\mathrm{cnt}}
     \right).
     \label{eq:zone_one_pass_cost}
 \end{equation}
 Under bounded candidate degree and fixed counter width, both terms grow linearly with the zone size. Extra counters parallelize only the accumulation term, so adding counters has a floor.
 
-% CHECKED: |M_z| = N_z, from CAPACITY_CONDITIONS_PER_UE = 1.0 in the plotting script.
-Fig.~\ref{fig:zone_crossover} sets $D_z=2N_z$, $\ell_{\mathrm{cnt},z}=3$, and $|\mathcal{M}_z|=N_z$ for all quantum curves. Depths convert to logical latency as $\tau_z=T_z t_{\mathrm{layer}}$ with $t_{\mathrm{layer}}=12.5$~ns, and the enhanced schedule uses $R_{\mathrm{cnt}}=4$ parallel counters. Each method is charged one local pass, excluding repeated search rounds, accepted-draw repetitions, readout, queueing, and boundary coordination.
+Fig.~\ref{fig:zone_crossover} sets $D_z=2N_z$, $Q_z^{\mathrm{cnt}}=3$, and $|\mathcal{M}_z|=N_z$ for all quantum curves. Depths convert to logical latency as $\tau_z=T_z t_{\mathrm{layer}}$ with $t_{\mathrm{layer}}=12.5$~ns, and the enhanced schedule uses $R_{\mathrm{cnt}}=4$ parallel counters. Each method is charged one local pass, excluding repeated search rounds, accepted-draw repetitions, readout, queueing, and boundary coordination.
 
-% VERIFY: confirm the 0.058--0.740 range in [jang2025cqf].
-% CHECKED: the fit gives G_z = 190.5 N_z + 94.5, hence 3524 gates at N_z = 18.
 The classical reference is $\rho N_z^3$~ns with $\rho=0.400$, inside the $0.058$--$0.740$ range measured for the Hungarian method in~\cite{jang2025cqf}. It favors the classical side because that method omits the capacity constraints evaluated here. Crossovers occur at $N_z=17.7$ for the enhanced schedule, $31.1$ for the serial schedule, $36.5$ for GAS, and $42.1$ for QTG. The current partition produces zones of $1$--$13$ UEs, the largest measured circuit costing $1\,906$ gates; the fitted $G_z$ curve reaches $N_z\approx18$ at about $3\,500$ gates, or $76\%$ above the current $2000$-gate budget.
 
-% ---------------------------------------------------------------
-%  FIGURE 10 -- single column, top of the page carrying Sec. V-E.
-% ---------------------------------------------------------------
 \begin{figure}[!t]
     \centering
     \includegraphics[width=\columnwidth]{fig/fig_scaling}
@@ -1268,7 +1233,6 @@ T. Kadowaki and H. Nishimori, ``Quantum annealing in the transverse
 Ising model,'' \emph{Phys. Rev. E}, vol. 58, no. 5, pp. 5355-5363,
 Nov. 1998.
 
-
 % -- quantum algorithm primary sources --
 \bibitem{nielsen2011}
 M. A. Nielsen and I. L. Chuang, \emph{Quantum Computation and
@@ -1287,7 +1251,6 @@ pp. 493-505, 1998.
 \bibitem{durr1996}
 C. D\"urr and P. H\o yer, ``A quantum algorithm for finding the
 minimum,'' arXiv:quant-ph/9607014, 1996.
-
 
 \bibitem{biamonte2017}
 J. Biamonte \emph{et al.}, ``Quantum machine learning,''
@@ -1455,8 +1418,6 @@ received the B.S. and M.S. degrees from the Korea Advanced Institute of Science 
 \end{IEEEbiographynophoto}
 
 \end{document}
-
-
 
 % Constrained Quantum Optimization at Utility Scale: Application to the Knapsack Problem
 
