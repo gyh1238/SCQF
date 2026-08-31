@@ -219,8 +219,17 @@ def sample_zone(zone, lam, k_accept, rng, pinned=None, max_draws=400_000):
     return codes_out, util_out, mu_hat, draws
 
 
+K_ROUNDS = 1        # amplification rounds per execution, Sec. V-A
+
+
+def accept_probability(mu, k=K_ROUNDS):
+    """P_z(k) = sin^2[(2k+1) arcsin sqrt(mu)], Eq. (34)."""
+    mu = np.clip(np.asarray(mu, dtype=float), 0.0, 1.0)
+    return np.sin((2 * k + 1) * np.arcsin(np.sqrt(mu))) ** 2
+
+
 def choose_execution_exponent(zone, beta_target, ubar, k_accept, shot_budget,
-                              tol=1e-3):
+                              tol=1e-3, k=K_ROUNDS):
     """
     Largest exponent this zone can afford to execute, Sec. IV-C of the paper.
 
@@ -231,13 +240,20 @@ def choose_execution_exponent(zone, beta_target, ubar, k_accept, shot_budget,
     to hit, and to restore the target exponent after measurement by
     reweighting each recorded draw (see `haiq_protocol`).
 
+    One execution is `k` amplification rounds, so a report costs
+    K_z / P_z(k) executions rather than K_z / mu_z: in the small-mu regime
+    these zones sit in, P_z(k) ~ (2k+1)^2 mu_z, and k = 1 buys a factor of
+    about nine.  Amplification does not touch the accepted law itself,
+    Eq. (35), so it moves the budget and nothing else.
+
     Returns (beta_z, mu_z, shots, k_eff).  `k_eff` is below `k_accept` only
     when even the uniform law (beta_z = 0) cannot meet the budget, in which
     case the zone reports fewer draws rather than exceeding it.
     """
     def shots_at(b):
         mu = acceptance_mass(zone, b / ubar)
-        return mu, (k_accept / mu if mu > 0 else np.inf)
+        p = accept_probability(mu, k)
+        return mu, (k_accept / p if p > 0 else np.inf)
 
     mu, s = shots_at(beta_target)
     if s <= shot_budget:
@@ -245,8 +261,9 @@ def choose_execution_exponent(zone, beta_target, ubar, k_accept, shot_budget,
 
     mu0, s0 = shots_at(0.0)
     if s0 > shot_budget:                       # even the uniform law is too dear
-        k_eff = max(1, int(shot_budget * mu0))
-        return 0.0, mu0, k_eff / mu0, k_eff
+        p0 = float(accept_probability(mu0, k))
+        k_eff = max(1, int(shot_budget * p0))
+        return 0.0, mu0, k_eff / p0, k_eff
 
     lo, hi = 0.0, beta_target                  # feasible at lo, not at hi
     while hi - lo > tol:

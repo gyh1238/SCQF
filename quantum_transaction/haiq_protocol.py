@@ -366,6 +366,7 @@ def _run_once(inst, part, beta, ubar, k_accept, k_min, shot_budget, rng,
         out["trace"] = trace
         out["holders"] = holders
         out["committed"] = committed
+        out["exc_by_zone"] = exc_by_zone   # re-samples charged to each zone
     return out
 
 
