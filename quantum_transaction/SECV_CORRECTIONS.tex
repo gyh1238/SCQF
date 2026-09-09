@@ -1,0 +1,304 @@
+% =====================================================================
+% SECV_CORRECTIONS.tex
+%
+% Corrections to Section V (Numerical Evaluation) and Appendix C, for the
+% manuscript revision that still carries the retired {\color{olive}} draft
+% block.  Every replacement below was re-measured from the code in this
+% directory; the measuring command is named with each item.
+%
+% This file is NOT part of the manuscript.  It carries only the passages
+% that change, so a correction can be pasted into the working copy without
+% diffing two full drafts.
+%
+% Status against the tracked manuscript_260901.tex:
+%   C1  outstanding there too, in a different place -- see the note
+%   C2  already correct there (rho = 0.400)
+%   C3  already correct there (16 seeds, 13 feasible) except the upper bound
+%   C4  already correct there ("never leaving the partition budget")
+%   C5  already correct there ("about sixfold as measured")
+%   C6  does not exist there; the worked example is only in the newer draft
+% =====================================================================
+
+\documentclass[10pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+\usepackage{kotex}
+
+\newcommand{\ket}[1]{\lvert #1 \rangle}
+\newcommand{\Was}{\par\smallskip\noindent\textbf{\textcolor{red!70!black}{Was:}}\par\nopagebreak}
+\newcommand{\Now}{\par\smallskip\noindent\textbf{\textcolor{green!35!black}{Replace with:}}\par\nopagebreak}
+\newcommand{\Why}{\par\smallskip\noindent\textbf{Measured:}\ }
+
+\title{Section~V corrections}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+\vspace{-2\baselineskip}
+
+Six passages disagree with the code that produced the figures. Items are
+ordered by how much a reader would be misled, not by page order.
+
+% ---------------------------------------------------------------------
+\section*{C1 \quad Sec.~V-C: $\beta_z$ range and effective sample size}
+
+These two numbers are the minima over the \emph{40-instance sweep} of
+Sec.~V-E. They are quoted in the paragraph describing the single campus
+snapshot, where they do not hold.
+
+\Was
+\begin{quote}
+The local sampling exponents $\beta_z$ range from $0.38$ to the common
+target of $1.50$ and are reweighted before coordination. At least $88$ of
+the $200$ samples remain effective in every zone after reweighting,
+indicating that the local sample sets maintain substantial statistical
+support for the subsequent boundary decisions.
+\end{quote}
+
+\Now
+\begin{quote}
+The local sampling exponents $\beta_z$ range from $1.36$ to the common
+target of $1.50$ and are reweighted before coordination. At least $198$ of
+the $200$ samples remain effective in every zone after reweighting,
+indicating that the local sample sets maintain substantial statistical
+support for the subsequent boundary decisions.
+\end{quote}
+
+\Why for the snapshot instance ($g=5$, seed $0$), $\beta_z\in[1.36,1.50]$
+and $\min_z\widetilde K_z=198$ of $200$
+(\texttt{python eval\_numbers.py}). The values $0.377$ and $87.7$ are the
+minima over all zones of all 40 sweep instances
+(\texttt{scaling\_data.npz}, columns \texttt{beta\_min}, \texttt{ess\_min}).
+
+\medskip\noindent\textbf{Note.} The sweep-wide statement is worth keeping,
+but it belongs in the Setup and must say so. The tracked
+\texttt{manuscript\_260901.tex} places it there already and writes
+``Across zones, $\beta_z$ ranges from $0.38$ to $1.50$ \ldots stays at or
+above $88$ of the $200$ retained'' --- correct for the whole evaluation,
+though ``across zones'' should be read as across every zone of every
+instance, which is worth making explicit.
+
+% ---------------------------------------------------------------------
+\section*{C2 \quad Sec.~V-D: classical coefficient $\rho$}
+
+The text and the figure legend print different constants.
+
+\Was
+\begin{quote}
+The classical reference is $\rho N_z^3$~ns with $\rho=0.399$, within the
+$0.058$--$0.740$ range measured for the Hungarian method \cite{kuhn1955}
+in~\cite{jang2025cqf}.
+\end{quote}
+
+\Now
+\begin{quote}
+The classical reference is $\rho N_z^3$~ns with $\rho=0.400$, within the
+$0.058$--$0.740$ range measured for the Hungarian method \cite{kuhn1955}
+in~\cite{jang2025cqf}.
+\end{quote}
+
+\Why \texttt{CLASSICAL\_COEFFICIENT\_NS = 0.400}
+(\texttt{fig/complexity/plot\_qtg\_assignment\_runtime.py:35}), and the
+plotted legend is the literal string \verb|$0.400N_z^3$ ns| (\texttt{:227}),
+so a reader sees $0.399$ in the text beside $0.400$ in the figure.
+
+% ---------------------------------------------------------------------
+\section*{C3 \quad Sec.~V-C: peer range and the excluded seeds}
+
+No instance reached the centralized optimum; $100.0\%$ is a rounding of
+$99.97\%$ that reads as if one had. The three dropped seeds are also
+unstated.
+
+\Was
+\begin{quote}
+Across 13 instances on the same map, the achieved utility ranges from
+$97.3\%$ to $100.0\%$, with a mean of $99.2\%$.
+\end{quote}
+
+\Now
+\begin{quote}
+The instance is drawn from a family of 16 seeds on the same map, 13 of
+which are globally feasible. Across those 13, the achieved utility ranges
+from $97.3\%$ to $99.97\%$, with a mean of $99.2\%$.
+\end{quote}
+
+\Why $97.34$--$99.97\%$, mean $99.19\%$, over the 13 feasible of 16 seeds
+(\texttt{python eval\_numbers.py}).
+
+\medskip\noindent\textbf{Do not apply this to Sec.~V-E.} There the range
+\emph{is} $96.79$--$100\%$: the sweep contains an instance at exactly
+$100.00\%$.
+
+% ---------------------------------------------------------------------
+\section*{C4 \quad Sec.~V-E: the partition budget is met, not undercut}
+
+The partitioner enforces $\mathrm{n2q}(z)\le\mathrm{budget}$, and one
+instance lands on $2000$ exactly, so ``below'' is not literally true.
+
+\Was
+\begin{quote}
+\ldots the largest zone circuit grows from $1{,}693$ to $1{,}950$ gates, a
+factor of only $1.15$, and remains below the 2000-gate partition budget for
+every region size.
+\end{quote}
+
+\Now
+\begin{quote}
+\ldots the largest zone circuit grows from $1{,}693$ to $1{,}950$ gates, a
+factor of only $1.15$, and never exceeds the 2000-gate partition budget at
+any region size.
+\end{quote}
+
+\Why the plotted curve is the per-size mean of each instance's largest
+zone, $1693\rightarrow1950$ ($\times1.152$), which the text reports
+correctly; but the worst single zone anywhere in the sweep is $2000$, in
+one of the 40 instances (\texttt{scaling\_data.npz}, column
+\texttt{zone2q}; constraint at \texttt{model\_partition.py:119}).
+
+\medskip\noindent Same subsection, the dropped instances should be stated:
+
+\Was
+\begin{quote}
+The sampled region is varied over seven sizes with several instances at
+each size, giving 40 instances in total.
+\end{quote}
+
+\Now
+\begin{quote}
+The sampled region is varied over seven sizes with six seeds each; two of
+the 42 instances are globally infeasible and dropped, leaving 40.
+\end{quote}
+
+\Why \texttt{scaling\_data.npz} stores \texttt{skipped}~$=2$.
+
+% ---------------------------------------------------------------------
+\section*{C5 \quad Sec.~V-A: the ninefold reduction is a bound, not the measurement}
+
+$(2k+1)^2=9$ is the $\mu_z\to0$ limit. The zones of this evaluation are not
+in that limit.
+
+\Was
+\begin{quote}
+For small $\mu_z$, \eqref{eq:success} gives $P_z(k)\simeq(2k+1)^2\mu_z$,
+giving approximately a ninefold reduction in the sampling cost for $k=1$.
+\end{quote}
+
+\Now
+\begin{quote}
+For small $\mu_z$, \eqref{eq:success} gives $P_z(k)\simeq(2k+1)^2\mu_z$, so
+$(2k+1)^2=9$ bounds the reduction in sampling cost at $k=1$; the ratio
+$P_z(k)/\mu_z$ measured over the zones of this evaluation is $5.9$.
+\end{quote}
+
+\Why $P_z(k)/\mu_z=5.9$ at $k=1$ (\texttt{python eval\_numbers.py}).
+
+% ---------------------------------------------------------------------
+\section*{C6 \quad Appendix~C: the worked decimation step, and its FIXME}
+
+Every number in this paragraph checks out. The commitment order does not:
+the run fixes UE~$12$ first, and UE~$14$ ends on RB35, not RB52. The
+\verb|% FIXME| comment that follows the paragraph must be deleted with the
+edit.
+
+\Was
+\begin{quote}
+\ldots When the consensus fixes UE $14$ to RB52, filtering by
+\eqref{eq:app-filter} retains the $0.63$ branch, the recomputed marginal of
+UE $12$ drops RB52 to zero, and the next commitment selects RB38: the
+infeasible pair favored by the one-pass product is thereby excluded from
+commitment.
+\end{quote}
+
+\Now
+\begin{quote}
+\ldots Decimation commits UE $12$ first, at confidence $0.89$, to RB38.
+Filtering by \eqref{eq:app-filter} then retains only the draws in which UE
+$12$ holds RB38, so the pair (RB52,~RB52) favored by the one-pass product
+leaves the zone's report before UE $14$ is considered. UE $14$ is committed
+later, at confidence $0.53$, to RB35, and the excluded pair never enters a
+commitment.
+\end{quote}
+
+\Why decimation trace of the snapshot run: step~$7$, UE~$12\rightarrow$
+index~$1=$~RB38, confidence $0.885$; step~$19$, UE~$14\rightarrow$
+index~$1=$~RB35, confidence $0.533$; final assignment UE~$12\rightarrow$
+RB38, UE~$14\rightarrow$ RB35.
+
+\medskip\noindent\textbf{Verified unchanged} in the same paragraph, so the
+preceding sentences need no edit:
+%
+\begin{itemize}\itemsep2pt
+  \item candidate sets $\{$RB52,~RB38$\}$ and $\{$RB52,~RB35$\}$, sharing
+        RB52 under $W_r=1$;
+  \item the three feasible joint probabilities $0.63$, $0.31$, $0.06$
+        (measured $0.629$, $0.307$, $0.065$);
+  \item marginals of RB52: $0.31$ for UE~$12$, $0.63$ for UE~$14$
+        (measured $0.307$, $0.629$);
+  \item $19\%$ of the product's belief on the excluded pair (measured
+        $19.3\%$; the second pair, zone Z0 UEs $30$~\&~$38$, also $19\%$).
+\end{itemize}
+
+\medskip\noindent Delete with the edit:
+\begin{quote}\ttfamily\footnotesize
+\% FIXME: verify against run log -- candidate sets of UEs 12/14, the three
+joint probabilities (0.63/0.31/0.06 read off (c1)), and whether UE 14 is
+indeed fixed first and to RB52. If the actual order differs, adjust the
+last sentence only; the logic is unchanged.
+\end{quote}
+\noindent The FIXME's own instruction was right: the logic is unchanged and
+only the last sentence moves.
+
+% ---------------------------------------------------------------------
+\section*{Verified, no change needed}
+
+Re-measured and matching to the quoted precision:
+
+\begin{itemize}\itemsep2pt
+  \item \textbf{Sec.~V-B, all of it.} Five zones admit statevector checks,
+        the largest at six UEs and 21 qubits; largest total-variation
+        distance $2.75\times10^{-15}$; no accepted probability outside
+        $\mathcal F_z$ in any zone (\texttt{python certify\_sampler.py}).
+  \item \textbf{Sec.~V-C.} $M=25$, $N=50$, $|\mathcal Z|=14$,
+        $|\mathcal B|=23$ ($46\%$); largest sampling distance $0.184$ at
+        $K_z=200$; $19\%$ misplaced belief on both dependent pairs;
+        ablation 11 of 14 by $+0.87$ points; five re-samples; $98.66\%$ of
+        $J^\star$.
+  \item \textbf{Sec.~V-D.} $t_{\mathrm{layer}}=12.5$~ns; slopes $113N_z$
+        and $381N_z$ (measured $114.4$, $382.6$ at $N_z=160$); GAS and QTG
+        $331N_z$ and $500N_z$ plus $37.5N_z\log_2 N_z$ (measured $607.8$
+        against $605.6$, and $776.2$ against $774.6$); crossovers $18$,
+        $31$, $37$, $42$ (measured $17.71$, $31.07$, $36.51$, $42.05$).
+  \item \textbf{Sec.~V-E, every figure.} $N=18\rightarrow162$;
+        $5.3\rightarrow45.0$ zones; centralized
+        $10{,}801\rightarrow173{,}983$ ($\times16.11$); largest zone
+        $1{,}693\rightarrow1{,}950$ ($\times1.152$); traffic $\times8.97$
+        against zone count $\times8.44$, per-zone $+6.3\%$; mean utility
+        $98.76$--$99.32\%$; individual $96.79$--$100\%$; all 40 feasible.
+  \item \textbf{Setup.} $\bar u$ is the mean over UEs of the largest
+        utility among their candidates
+        (\texttt{model\_instance.py:157--164}); $|\mathcal C_i|\le2$,
+        $\beta=1.5$, $k=1$, $K_z=200$, $K_{\min}=25$, $10^4$-execution cap
+        (measured $201$--$9{,}997$ per zone).
+\end{itemize}
+
+% ---------------------------------------------------------------------
+\section*{Open flag, tracked draft only}
+
+Not in the draft these corrections target, but present in
+\texttt{manuscript\_260901.tex}, Sec.~V-D:
+
+\begin{quote}
+The current partition produces zones of $1$--$13$ UEs, the largest measured
+circuit costing $1{,}906$ gates \ldots
+\end{quote}
+
+\noindent $1{,}906$ could not be reproduced. The snapshot partition's
+largest zone is $1{,}910$ two-qubit gates, and the largest anywhere in the
+40-instance sweep is $2{,}000$. Either the number predates a regeneration
+of the cache or it counts a set this check did not identify; it should be
+re-derived before submission.
+
+\end{document}
