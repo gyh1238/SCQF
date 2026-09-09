@@ -17,19 +17,19 @@ The **index of a candidate**, not an AP or RB identifier. Eq. (state-width),
 
 The resource is recovered by lookup, not carried in the register:
 
-    r = zone.cand[k][ci]        # code -> RB          (haiq_zone.py:85)
-    a = zone.rb_owner[r]        # RB   -> owning AP   (haiq_zone.py:86)
+    r = zone.cand[k][ci]        # code -> RB          (proto_zone.py:85)
+    a = zone.rb_owner[r]        # RB   -> owning AP   (proto_zone.py:86)
 
-`cand[i]` and `util[i]` are index-aligned (`haiq_instance.py:44-46`), which is
+`cand[i]` and `util[i]` are index-aligned (`model_instance.py:44-46`), which is
 what makes the index sufficient. `enumerate_zone` therefore iterates over code
 tuples, not over RB combinations.
 
 In the Sec. V evaluation `|C_i| <= 2`, so `l_i = 1`: **one UE = one bit**,
-`0 -> cand[i][0]`, `1 -> cand[i][1]`. `haiq_certify.py:56` asserts this.
+`0 -> cand[i][0]`, `1 -> cand[i][1]`. `certify_sampler.py:56` asserts this.
 
 Codewords with no candidate (when `|C_i|` is not a power of two) are killed by a
 validity flag, Eq. (validity-flag) at `manuscript_260901.tex:623`; the builder
-collects them as `novel` in `haiq_certify.py:68-73`. At `|C_i| = 2` the set is
+collects them as `novel` in `certify_sampler.py:68-73`. At `|C_i| = 2` the set is
 empty and that path is inert.
 
 The recurring `if c == 0: qc.x(code[k])` idiom is control polarity: a code qubit
@@ -38,14 +38,14 @@ controls on 1, so selecting value 0 means conjugating by X.
 ## 2. Zone is the execution unit, not AP
 
 One zone = one circuit = one oracle `O_z`. APs are what gets *grouped into* a
-zone, which is exactly what `haiq_partition.py` does under a two-qubit budget.
+zone, which is exactly what `model_partition.py` does under a two-qubit budget.
 `manuscript_260901.tex:402`:
 
 > Each zone contains a subset of APs and the UEs with assignment candidates in
 > that zone.
 
 The number of APs in a zone does not change the code width. It changes only the
-number of `W_a` flags -- one per owned AP (`haiq_certify.py:57-58`). Measured
+number of `W_a` flags -- one per owned AP (`certify_sampler.py:57-58`). Measured
 partition at g=5, seed=1:
 
 | zone | APs | RBs | UEs | Q_z | ap flags |
@@ -68,7 +68,7 @@ one physical QPU per zone; a zone is a circuit-decomposition unit.
 
 ## 3. Why each UE ends up with two candidates
 
-It is imposed, not emergent. `haiq_instance.py:139-150` keeps the top `max_deg`
+It is imposed, not emergent. `model_instance.py:139-150` keeps the top `max_deg`
 candidates by utility:
 
     order = np.argsort(-u)[:max_deg]        # "keep the strongest APs"
@@ -83,7 +83,7 @@ Mean 3.66, max 6. After truncation: 48 UEs with two candidates, 2 with one.
 
 Candidate count equals covering-AP count because an AP offers each covered UE
 **exactly one** RB from its pool, allocated round robin by proximity
-(`haiq_instance.py:131-136`). Per the module's own comment, it is coverage
+(`model_instance.py:131-136`). Per the module's own comment, it is coverage
 overlap -- not RB multiplicity inside one AP -- that creates boundary UEs.
 
 `max_deg=2` is an evaluation choice, not physics: it yields `l_i = 1`, no invalid
@@ -100,7 +100,7 @@ A candidate is already the pair `(a, r)`, so one bit fixes both.
 Which RB an AP offers is decided at instance-build time by the round robin above,
 so **the RB-within-AP choice is not a search variable in the scaling and snapshot
 experiments**. The quantum circuit for RB selection exists separately
-(`qtg_intra_assignment.py`, 2 bits/node, `00->RB0, 01->RB1, 10->RB2, 11->invalid`).
+(`circuit_intra.py`, 2 bits/node, `00->RB0, 01->RB1, 10->RB2, 11->invalid`).
 
 `W_r = 1` still bites, because `rank % len(pool)` wraps: one AP covers up to 14
 UEs but owns 4 RBs. Of the 80 RBs appearing as candidates, 17 are claimed by more
@@ -130,7 +130,7 @@ Measured with `zone_2q_cost`, worst single AP at g=5, seed=1:
 | 4 | 3.34 | 2 | 3930 |
 | 8 | 3.66 | 3 | 7946 |
 
-The 1554 -> 3490 jump at `l = 1 -> 2` has two causes in `haiq_cost.py:96-105`:
+The 1554 -> 3490 jump at `l = 1 -> 2` has two causes in `model_cost.py:96-105`:
 each candidate pays `2*mcx_2q(l) + 2` for its match, and unused codewords
 (`2**l - |C_i|`) each add a validity flag.
 
@@ -141,7 +141,7 @@ dominates, so the saving is small.
 **Partition constraint.** An AP is the atom of the partition, so the budget must
 exceed the most expensive single AP. At `l = 2` that is already 3490 against the
 current 2000, so raising `m` forces the budget up and further above the measured
-Heron2 ceiling (~587 2q at the 50% signal point, `haiq_cost.py:31-38`).
+Heron2 ceiling (~587 2q at the 50% signal point, `model_cost.py:31-38`).
 
 ## 6. Cheaper encodings
 
@@ -159,10 +159,10 @@ not need to know which RB was taken, so the AP counter can be controlled on the
 AP field alone and pays one accumulate per `(i,a)` pair instead of per `(i,a,r)`
 edge -- `k` instead of `k*m`. Free in qubits, and it matches the paper's own
 inter/intra split. Today the accumulate is controlled on the full codeword
-(`haiq_cost.py:118-124`).
+(`model_cost.py:118-124`).
 
 **(b) Make the RB field one-hot.** The binding resource is two-qubit gates, not
-qubits -- `haiq_cost.py` header: "the executable size of these circuits is set by
+qubits -- `model_cost.py` header: "the executable size of these circuits is set by
 the two-qubit gate count -- not by the qubit count", and `README_figs.md`: "qubit
 width is never the binding constraint at these zone sizes". Trading qubits for
 gates is therefore favourable here. One-hot turns each match from a
@@ -173,10 +173,10 @@ Caveat: one-hot introduces an exactly-one condition. Checking it with a flag eat
 the gain. Prepare the field with a chain of controlled `R_Y` rotations (a
 W-state-shaped preparation) instead of `H^m` and exactly-one holds by
 construction, no flag needed -- which also removes the `novel`/`val_flag` path in
-`haiq_certify.py:68-73`. In the manuscript only the definition of `q_0` changes;
+`certify_sampler.py:68-73`. In the manuscript only the definition of `q_0` changes;
 the accepted-branch derivation is untouched.
 
-**(c) Replace fixed top-k with a utility-gap rule.** `haiq_instance.py:148`
+**(c) Replace fixed top-k with a utility-gap rule.** `model_instance.py:148`
 currently gives every UE the same `max_deg` candidates, but many UEs have a
 dominant first choice (12 UEs are covered by at most two APs). Keeping only
 candidates within `delta` of the best makes `D_z` follow the mean rather than the

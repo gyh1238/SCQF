@@ -21,11 +21,11 @@ Run:  python backoff_study.py
 
 import numpy as np
 
-from haiq_instance import make_instance, utility_scale
-from haiq_partition import partition_aps
-from haiq_protocol import run_protocol
-from haiq_reference import solve_centralized
-from haiq_zone import (K_ROUNDS, amplification_rounds, build_zone,
+from model_instance import make_instance, utility_scale
+from model_partition import partition_aps
+from proto_coordination import run_protocol
+from model_reference import solve_centralized
+from proto_zone import (K_ROUNDS, amplification_rounds, build_zone,
                        choose_execution_exponent)
 
 BETA = 1.5

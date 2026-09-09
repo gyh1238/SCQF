@@ -17,7 +17,7 @@ accepted-branch law is therefore
 which is *exactly* independent per-UE sampling with weight g_{z,i} followed
 by rejection on strict feasibility.  The classical routine below is that
 same sampler, so it is not an approximation of the quantum output but the
-identical law; `haiq_certify.py` verifies the equality against a Qiskit
+identical law; `certify_sampler.py` verifies the equality against a Qiskit
 statevector.  The quantum and classical versions differ only in cost: the
 classical sampler needs ~K/mu_z draws for K accepted samples, while
 amplitude amplification reaches the accepted branch in O(mu_z^{-1/2})
@@ -238,7 +238,7 @@ def choose_execution_exponent(zone, beta_target, ubar, k_accept, shot_budget,
     The remedy is not to shrink the target but to execute at a lower
     beta_z <= beta, where the accepted law is flatter and therefore cheaper
     to hit, and to restore the target exponent after measurement by
-    reweighting each recorded draw (see `haiq_protocol`).
+    reweighting each recorded draw (see `proto_coordination`).
 
     One execution is `k` amplification rounds, so a report costs
     K_z / P_z(k) executions rather than K_z / mu_z: in the small-mu regime
@@ -283,8 +283,8 @@ def amplification_rounds(mu):
 
 
 if __name__ == "__main__":
-    from haiq_instance import make_instance, utility_scale
-    from haiq_partition import partition_aps
+    from model_instance import make_instance, utility_scale
+    from model_partition import partition_aps
 
     inst = make_instance(g=5, seed=1, max_deg=2, n_rb_per_ap=4)
     part = partition_aps(inst)

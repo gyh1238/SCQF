@@ -1,7 +1,14 @@
 """
 The zone circuit on a noisy device.
 ===================================
-`haiq_certify` proves the classical sampler reproduces the circuit's accepted
+Which of the two noise modules is this?  `noise_oracle.py` asks the same question
+of the released `circuit_inter`/`circuit_intra` oracles and is what Sec. V-B
+quotes.
+This one asks it of the `certify_sampler` zone circuit, one stack earlier, and is
+the only place the leak metric is posed against that circuit directly.  It is
+imported by nothing; run it on its own.
+
+`certify_sampler` proves the classical sampler reproduces the circuit's accepted
 branch exactly, on a noiseless statevector.  That is what licenses the figures,
 and it stays: an exact identity is not something a noisy run can establish.
 
@@ -42,7 +49,7 @@ Two noise sources:
     contains, so keeping the two effects apart is the only way either number
     means anything.
 
-Usage:  python haiq_noise.py
+Usage:  python noise_zone.py
 """
 
 import numpy as np
@@ -115,8 +122,8 @@ def noisy_zone_law(zone, lam, noise, max_qubits=MAX_QUBITS):
     """
     from qiskit import transpile
     from qiskit_aer import AerSimulator
-    from haiq_certify import build_zone_circuit
-    from haiq_zone import enumerate_zone
+    from certify_sampler import build_zone_circuit
+    from proto_zone import enumerate_zone
 
     qc, meta = build_zone_circuit(zone, lam)
     if qc.num_qubits > max_qubits:
@@ -132,7 +139,7 @@ def noisy_zone_law(zone, lam, noise, max_qubits=MAX_QUBITS):
     diag = diag / diag.sum()
     diag = _readout_confusion(diag, qc.num_qubits, getattr(noise, "readout", None))
 
-    # the same split `haiq_certify` makes: code register low, everything the
+    # the same split `certify_sampler` makes: code register low, everything the
     # acceptance test looks at above it, and all of that has to be zero
     n = meta["n"]
     n_aux = meta["w_cnt"] + meta["n_rb"] + meta["n_ap"] + meta["n_val"]
@@ -165,7 +172,7 @@ def routing_cost(zone, lam, name="FakeSherbrooke"):
     """
     from qiskit import transpile
     from qiskit_ibm_runtime import fake_provider
-    from haiq_certify import build_zone_circuit
+    from certify_sampler import build_zone_circuit
     backend = getattr(fake_provider, name)()
     qc, _ = build_zone_circuit(zone, lam)
     flat = transpile(qc, basis_gates=["u", "cx"], optimization_level=1)
@@ -184,10 +191,10 @@ def zones_that_fit(g=3, seed=5, beta=1.5, max_qubits=MAX_QUBITS):
     reports leak zero at any noise level and has proved nothing -- there was
     nowhere for the probability to leak to.
     """
-    from haiq_instance import make_instance, utility_scale
-    from haiq_partition import partition_aps
-    from haiq_zone import build_zone, enumerate_zone
-    from haiq_certify import build_zone_circuit
+    from model_instance import make_instance, utility_scale
+    from model_partition import partition_aps
+    from proto_zone import build_zone, enumerate_zone
+    from certify_sampler import build_zone_circuit
 
     inst = make_instance(g=g, seed=seed)
     part = partition_aps(inst)
@@ -255,7 +262,7 @@ if __name__ == "__main__":
     print(f"\n{d.backend_name} calibration, all-to-all: "
           f"mu={r['mu']:.4f}  TVD={r['tvd']:.3f}  leak={r['leak']:.3f}")
 
-    from haiq_cost import BUDGET_DEFAULT
+    from model_cost import BUDGET_DEFAULT
     slope, _, _ = leak_per_gate(zone, lam)
     print(f"\nleak grows at {slope:.3f} per unit of (two-qubit error x gates), "
           f"so in a {BUDGET_DEFAULT}-gate zone:")

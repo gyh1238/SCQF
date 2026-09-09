@@ -25,7 +25,7 @@ The instance comes from the same generator as the scaling figure, but with
 stand on registered base stations read off the operators' map, UEs on open
 ground, and panel (a) is drawn over the campus so the shape of a zone can be
 read against the ground that produced it.  The region is the whole
-campus, and `G` is how densely it is covered.  See `haiq_geo.py`.  The
+campus, and `G` is how densely it is covered.  See `model_geo.py`.  The
 scaling figure stays on the square, where a flat lattice states the bounded
 density its claim rests on; both are the same protocol on the same
 generator, differing only in where the points are allowed to fall.
@@ -38,7 +38,7 @@ side by side; on the campus some seeds have no centralized optimum at all
 (UEs bunch onto open ground faster than the APs facing it can admit them)
 and those are skipped by both scripts.
 
-Usage:  python make_fig_snapshot.py
+Usage:  python fig_snapshot.py
 """
 
 import glob
@@ -52,11 +52,11 @@ from matplotlib.colors import to_rgb
 from matplotlib.patches import Patch
 from matplotlib.patheffects import withStroke
 
-from haiq_instance import make_instance, utility_scale
-from haiq_partition import partition_aps
-from haiq_protocol import run_protocol
-from haiq_reference import solve_centralized
-from haiq_cost import BUDGET_DEFAULT
+from model_instance import make_instance, utility_scale
+from model_partition import partition_aps
+from proto_coordination import run_protocol
+from model_reference import solve_centralized
+from model_cost import BUDGET_DEFAULT
 
 PANEL_DIR = "fig/panels"
 
@@ -71,7 +71,7 @@ FS_TICK = 6.5
 FS_LEGEND = 6.2
 COL_RATIO = "#1f6fb4"
 
-GEO = True         # place the region on the campus rasters; see haiq_geo.py
+GEO = True         # place the region on the campus rasters; see model_geo.py
 BASEMAP_DESAT = 0.0    # how far the campus is pulled toward its own luminance
 
 N_ZONE_PANELS = 4
@@ -233,8 +233,8 @@ def panel_map(ax, inst, part, active, zcol, desat=None):
     # transparent page, and this alpha sits over an opaque basemap.
     on_map = inst.geo is not None
     if on_map:
-        import haiq_geo
-        img, extent = haiq_geo.basemap(
+        import model_geo
+        img, extent = model_geo.basemap(
             inst.geo, desat=BASEMAP_DESAT if desat is None else desat)
         # "antialiased" picks the right filter in both directions -- the same
         # basemap is minified in the composite and magnified in the standalone

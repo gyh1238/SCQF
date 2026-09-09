@@ -124,7 +124,7 @@ def utility_scale(utility):
     The utility model's scale `ubar`, so that `lambda = beta / ubar` is
     dimensionless and one `beta` means the same thing in every zone.  Defined
     from the model's dynamic range -- the mean of the per-UE best utility --
-    rather than from an instance, exactly as `haiq_instance.utility_scale`.
+    rather than from an instance, exactly as `model_instance.utility_scale`.
     """
     return float(np.mean(np.max(np.asarray(utility, dtype=float), axis=1)))
 

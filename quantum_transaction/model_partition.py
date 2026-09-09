@@ -29,7 +29,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from haiq_cost import zone_2q_cost, BUDGET_DEFAULT
+from model_cost import zone_2q_cost, BUDGET_DEFAULT
 
 
 @dataclass
@@ -171,7 +171,7 @@ def partition_aps(inst, budget=BUDGET_DEFAULT, refine_passes=6, verbose=False):
 
 
 if __name__ == "__main__":
-    from haiq_instance import make_instance
+    from model_instance import make_instance
 
     for g in (4, 5, 6, 7):
         inst = make_instance(g=g, seed=1, max_deg=2, n_rb_per_ap=4)

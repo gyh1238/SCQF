@@ -77,7 +77,7 @@ def check_feasible(inst):
 
 
 if __name__ == "__main__":
-    from haiq_instance import make_instance
+    from model_instance import make_instance
 
     for g in (4, 5, 6, 7, 8):
         inst = make_instance(g=g, seed=1, max_deg=2, n_rb_per_ap=4, radius=1.0)

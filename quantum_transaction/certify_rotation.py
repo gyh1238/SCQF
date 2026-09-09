@@ -37,8 +37,8 @@ import numpy as np
 from qiskit import QuantumCircuit, QuantumRegister
 from qiskit.quantum_info import Statevector
 
-import qtg_inter_assignment as inter
-import qtg_intra_assignment as intra
+import circuit_inter as inter
+import circuit_intra as intra
 
 
 # --------------------------------------------------------------- exact laws

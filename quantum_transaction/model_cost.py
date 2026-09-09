@@ -20,7 +20,7 @@ conservative choice (a centralized circuit has a smaller accepted mass and
 would need *more* rounds than a zone).
 
 `calibrate.py`-style validation against real Qiskit transpilation lives in
-`haiq_certify.py`.
+`certify_sampler.py`.
 """
 
 from math import ceil, log2
@@ -145,7 +145,7 @@ def centralized_2q_cost(inst):
 
 
 if __name__ == "__main__":
-    from haiq_instance import make_instance
+    from model_instance import make_instance
 
     print(f"hardware 2q ceilings (50% signal):  kingston={CEIL_KINGSTON}  boston={CEIL_BOSTON}")
     for g in (3, 4, 5, 6):

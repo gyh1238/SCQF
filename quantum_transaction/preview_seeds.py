@@ -11,11 +11,11 @@ choice: how many APs the ground actually accepted, how evenly the
 partitioner split the region, whether it left many single-AP zones, and how
 heavy the boundary is.
 
-Instances come from `make_fig_snapshot.build_instance`, so the preview is
+Instances come from `fig_snapshot.build_instance`, so the preview is
 drawn on whatever geometry the figure uses -- with `snap.GEO` set, the same
 window of campus, over the same basemap.
 
-Set the chosen value as `SEED` in `make_fig_snapshot.py`.
+Set the chosen value as `SEED` in `fig_snapshot.py`.
 
 Usage:  python preview_seeds.py [n_seeds]
 """
@@ -27,11 +27,11 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from haiq_instance import utility_scale
-from haiq_partition import partition_aps
-from haiq_protocol import run_protocol
-from haiq_reference import solve_centralized
-import make_fig_snapshot as snap
+from model_instance import utility_scale
+from model_partition import partition_aps
+from proto_coordination import run_protocol
+from model_reference import solve_centralized
+import fig_snapshot as snap
 
 
 def evaluate(seed):

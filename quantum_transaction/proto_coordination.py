@@ -23,7 +23,7 @@ Sec. V-D, counted and reported.
 
 import numpy as np
 
-from haiq_zone import (build_zone, enumerate_zone, sample_zone,
+from proto_zone import (build_zone, enumerate_zone, sample_zone,
                        choose_execution_exponent)
 
 
@@ -371,9 +371,9 @@ def _run_once(inst, part, beta, ubar, k_accept, k_min, shot_budget, rng,
 
 
 if __name__ == "__main__":
-    from haiq_instance import make_instance, utility_scale
-    from haiq_partition import partition_aps
-    from haiq_reference import solve_centralized
+    from model_instance import make_instance, utility_scale
+    from model_partition import partition_aps
+    from model_reference import solve_centralized
 
     for g in (4, 5, 6):
         inst = make_instance(g=g, seed=2)

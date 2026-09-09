@@ -18,7 +18,7 @@ figure, and it is exactly the "bounded zone density and bounded candidate
 degree" regime the manuscript invokes in Sec. V-D.
 
 Passing `geo=True` keeps every density above but takes the *positions* from
-a real campus (`haiq_geo`): UEs are drawn over open ground only, and the APs
+a real campus (`model_geo`): UEs are drawn over open ground only, and the APs
 are placed to carry equal shares of that ground before being snapped to a
 roof or lot they may legally occupy -- a lattice laid over a campus spends
 APs on hillside nobody stands on.  There the region is
@@ -48,7 +48,7 @@ class Instance:
     w_ap: int                  # AP admission limit (per AP)
     g: int                     # grid side (region size)
     seed: int
-    geo: object = None         # haiq_geo.Window if placed on the campus, else None
+    geo: object = None         # model_geo.Window if placed on the campus, else None
 
     # ---- derived sizes ----
     @property
@@ -96,9 +96,9 @@ def make_instance(g=5, ue_per_ap=2.0, n_rb_per_ap=4, radius=1.2,
 
     # --- APs on a jittered unit grid -------------------------------------
     if geo:
-        import haiq_geo
-        window = haiq_geo.window_for(g)
-        ap_xy = haiq_geo.place_aps(rng, g, window, jitter=jitter)
+        import model_geo
+        window = model_geo.window_for(g)
+        ap_xy = model_geo.place_aps(rng, g, window, jitter=jitter)
         if len(ap_xy) == 0:
             raise ValueError(f"no AP could be placed in {window}")
     else:
@@ -116,7 +116,7 @@ def make_instance(g=5, ue_per_ap=2.0, n_rb_per_ap=4, radius=1.2,
     # --- UEs uniform over the region -------------------------------------
     n_ue = int(round(ue_per_ap * n_ap))
     if geo:
-        ue_xy = haiq_geo.place_ues(rng, n_ue, window)
+        ue_xy = model_geo.place_ues(rng, n_ue, window)
     else:
         ue_xy = rng.uniform(-0.5, g - 0.5, size=(n_ue, 2))
 

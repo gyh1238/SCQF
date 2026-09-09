@@ -48,7 +48,7 @@ The noise-free distance is measured at the same shot count and printed beside
 the noisy one: they are two measurements of the same quantity under two
 devices, not an additive decomposition -- finite sampling and noise do not add.
 
-Run:  python noise_run.py [--shots 10000] [--backend FakeSherbrooke] [--sweep]
+Run:  python noise_oracle.py [--shots 10000] [--backend FakeSherbrooke] [--sweep]
 """
 
 import argparse
@@ -59,8 +59,8 @@ from qiskit import transpile
 from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel, depolarizing_error
 
-import qtg_inter_assignment as inter
-import qtg_intra_assignment as intra
+import circuit_inter as inter
+import circuit_intra as intra
 from certify_rotation import gibbs, tvd
 
 SHOTS = 10_000
@@ -102,7 +102,7 @@ def depolarizing(p2, p1=None, p_ro=None):
     One-qubit gates at `p2/10` and readout at `p2/5` is the ordering
     superconducting hardware actually has, so a sweep in `p2` moves the whole
     device along a plausible line rather than an arbitrary one.  Same
-    convention as `haiq_noise.depolarizing`.
+    convention as `noise_zone.depolarizing`.
     """
     p1 = p2 / 10.0 if p1 is None else p1
     p_ro = p2 / 5.0 if p_ro is None else p_ro

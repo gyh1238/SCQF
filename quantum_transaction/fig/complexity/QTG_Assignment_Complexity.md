@@ -245,7 +245,7 @@ D_{\mathrm{QTG},z}^{\mathrm{total}}
 \left(2D_{\mathrm{QTG},z}^{\mathrm{prep}}+D_{\mathrm{mark},z}\right).
 $$
 
-The graph excludes $R_{\mathrm{QTG},z}$ and plots one joint-capacity preparation/search pass. The supplied `qtg_inter_assignment.py` and `qtg_intra_assignment.py` are restricted adapters for separate subproblems; they are useful implementation references but are not separate baselines for the unified paper.
+The graph excludes $R_{\mathrm{QTG},z}$ and plots one joint-capacity preparation/search pass. The supplied `circuit_inter.py` and `circuit_intra.py` are restricted adapters for separate subproblems; they are useful implementation references but are not separate baselines for the unified paper.
 
 ## 10.7 Approach-level comparison
 

@@ -1,7 +1,7 @@
 """
 Statevector certification of the zone-local law.
 ================================================
-`haiq_zone.sample_zone` claims to reproduce the accepted branch of the
+`proto_zone.sample_zone` claims to reproduce the accepted branch of the
 circuit exactly rather than to approximate it.  This module checks that
 claim on a real Qiskit circuit built to the manuscript's specification:
 
@@ -26,9 +26,9 @@ import numpy as np
 from qiskit import QuantumCircuit, QuantumRegister
 from qiskit.quantum_info import Statevector
 
-from haiq_instance import make_instance, utility_scale
-from haiq_partition import partition_aps
-from haiq_zone import build_zone, enumerate_zone, _per_ue_weights
+from model_instance import make_instance, utility_scale
+from model_partition import partition_aps
+from proto_zone import build_zone, enumerate_zone, _per_ue_weights
 
 
 def _increment(qc, ctrl, cnt):

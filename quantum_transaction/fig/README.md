@@ -46,8 +46,8 @@ script clears its own panels before writing so stale names cannot linger.
 Regenerate everything with:
 
 ```bash
-python make_fig_scaling.py               # --recollect to redo the sweep
-python make_fig_snapshot.py
+python fig_scaling.py               # --recollect to redo the sweep
+python fig_snapshot.py
 python preview_seeds.py 12               # only to re-choose the region
 ```
 
@@ -65,7 +65,7 @@ Two caches hold the sweeps, since both take minutes to recompute:
 | `../ablation_data.npz` | the joint-vs-marginal comparison behind (c3): the 14 of 16 campus instances with a centralized optimum | delete the file |
 
 How many panels each row shows is set by `N_ZONE_PANELS` (4) and
-`N_BND_PANELS` (2) in `make_fig_snapshot.py`; the grid widths follow.
+`N_BND_PANELS` (2) in `fig_snapshot.py`; the grid widths follow.
 
 ## 2. Symbols
 
@@ -183,7 +183,7 @@ the instances used) because an AP is the atom of the partition.
 Only `g` changes along the growth axis. Every density is held fixed, so
 growing `g` grows the *global* problem without changing local structure.
 
-### Campus placement (`geo=True`, `haiq_geo.py`)
+### Campus placement (`geo=True`, `model_geo.py`)
 
 The densities above are unchanged; what changes is *where* the points may
 fall — and what `g` means.
@@ -297,10 +297,10 @@ where a base station goes. A rooftop in a 3D render is drawn displaced from
 its own footprint, and a good share of real masts stand at the roadside, which
 the mask excludes.
 
-So the numbers are meant to be edited: change them, run `python haiq_geo.py`,
+So the numbers are meant to be edited: change them, run `python model_geo.py`,
 and look at `bs_overlay.png` to see what you did.
 
-`python haiq_geo.py` prints the footprint at each `g`, how much of it each mask
+`python model_geo.py` prints the footprint at each `g`, how much of it each mask
 allows, the mast count, and rewrites the overlay.
 
 The scaling figure deliberately stays on the square, and the two axes are not
@@ -338,7 +338,7 @@ and prints the numbers behind the choice.
   `panels/snapshot_a_partition_muted_basemap.*` is the same panel with the map
   pulled 85 % toward its own luminance — every edge kept, hue removed — for a
   page too dense to spend colour on context. Both are written every run, one
-  `desat` apart; `BASEMAP_DESAT` in `make_fig_snapshot.py` sets which one the
+  `desat` apart; `BASEMAP_DESAT` in `fig_snapshot.py` sets which one the
   composite uses.
 - **coloured outlines**: zone territory — the border of the region whose every
   point has its *nearest* AP in that zone, drawn in the zone's colour over a
@@ -382,7 +382,7 @@ The four zones with the largest $\vert\mathcal{F}_z\vert$.
 
 Bars tracking the step curve is the claim that the sampler reproduces the
 circuit's law. Departures are finite-sample noise at $K_z=200$, larger where
-$\widetilde K_z$ is smaller; `haiq_certify.py` checks the same statement exactly against a
+$\widetilde K_z$ is smaller; `certify_sampler.py` checks the same statement exactly against a
 Qiskit statevector (max TVD $2.7\times10^{-15}$, zero spurious states).
 
 ### (c1)–(c3) why the boundary report is a joint list
@@ -594,7 +594,7 @@ centralized circuit and the total traffic grow with it, at no cost in quality.
   lives. A triangle reads about as well as the square and no better. The
   square wins on the one thing that matters here — it is the largest patch of
   unambiguous colour a marker of that size can be.
-- Type sizes come from four constants at the top of `make_fig_snapshot.py` —
+- Type sizes come from four constants at the top of `fig_snapshot.py` —
   `FS_TITLE` 8, `FS_LABEL` 7.5, `FS_TICK` 6.5, `FS_LEGEND` 6.2 — so panels
   cannot drift apart. The scaling figure sets its sizes inline, being three
   panels rather than eleven.

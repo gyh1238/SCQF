@@ -57,7 +57,7 @@ finer grain rather than seeing more ground.  That is a deliberate difference
 from the scaling figure's growth axis, which holds ground density fixed and
 stays on the square for exactly that reason.
 
-Run `python haiq_geo.py` for the footprint and how much of it each mask
+Run `python model_geo.py` for the footprint and how much of it each mask
 allows.
 """
 
@@ -103,7 +103,7 @@ BS_MAP_FILE = "real_bs.png"
 # which the mask excludes.
 #
 # So: change these numbers if the overlay looks wrong to you, and regenerate
-# `fig/bs_overlay.png` with `python haiq_geo.py` to see what you did.  The `y`
+# `fig/bs_overlay.png` with `python model_geo.py` to see what you did.  The `y`
 # scale and the offsets started from the running track, whose centre reads
 # (258, 108) on the source and (470, 210) on the campus, and were then set by
 # eye against the overlay -- which is the only instrument this fit has.

@@ -1,6 +1,11 @@
 """
 Hybrid Quantum-Classical Network Assignment Example
 ====================================================
+Standalone illustration.  It shares no code with `model_*`, `proto_*` or
+`circuit_*` -- it
+predates them and states the idea on a hand-sized instance, where every step
+can be read off the printout.  The evaluated protocol is `proto_coordination.py`.
+
 향후 방향 5단계를 간단한 예제로 구현:
   1. Network Decomposition: 글로벌 네트워크를 로컬 서브문제로 분할
   2. Local Solver: 각 서브문제를 CQF 스타일 양자 회로(Grover)로 해결

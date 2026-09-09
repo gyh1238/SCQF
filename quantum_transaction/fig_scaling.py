@@ -19,7 +19,7 @@ circuit and the total traffic grow with it -- at no cost in solution
 quality.  No competing protocol is needed for this; the centralized optimum
 enters only as the denominator of (c).
 
-Usage:  python make_fig_scaling.py [--recollect]
+Usage:  python fig_scaling.py [--recollect]
 """
 
 import argparse
@@ -33,11 +33,11 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.colors import to_rgb
 
-from haiq_instance import make_instance, utility_scale
-from haiq_partition import partition_aps
-from haiq_cost import centralized_2q_cost, BUDGET_DEFAULT
-from haiq_protocol import run_protocol
-from haiq_reference import solve_centralized
+from model_instance import make_instance, utility_scale
+from model_partition import partition_aps
+from model_cost import centralized_2q_cost, BUDGET_DEFAULT
+from proto_coordination import run_protocol
+from model_reference import solve_centralized
 
 CACHE = "scaling_data.npz"
 G_VALUES = (3, 4, 5, 6, 7, 8, 9)
