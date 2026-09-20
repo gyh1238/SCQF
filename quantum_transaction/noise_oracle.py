@@ -145,7 +145,15 @@ def noisy_law(qc, meta, feasible, noise, shots, seed=11):
     tqc = transpile(qc, basis_gates=BASIS, optimization_level=1)
     sim = AerSimulator(noise_model=noise)
     counts = sim.run(tqc, shots=shots, seed_simulator=seed).result().get_counts()
+    return law_from_counts(counts, meta, feasible)
 
+
+def law_from_counts(counts, meta, feasible):
+    """Acceptance test of Sec. IV-F applied to raw counts, from any device.
+
+    Shared by the simulator above and `hw_oracle.py`, so a hardware row and a
+    simulated row are scored by the same code.
+    """
     n_assign, n_cost = meta["n_assign"], meta["n_cost"]
     law, n_acc, n_leak, n_tot = {}, 0, 0, 0
     for bits, c in counts.items():
@@ -169,16 +177,24 @@ def noisy_law(qc, meta, feasible, noise, shots, seed=11):
 
 # --------------------------------------------------------------- the problems
 
+INTER_UTILITY = np.array([[6.01, 3.97],
+                          [1.10, 8.36],
+                          [6.88, 2.21],
+                          [2.85, 9.11]])
+
+
+def inter_case(w=(1, 1, 1, 1), cap=2, k=1):
+    """The inter-cell sampler at demands `w` and AP capacity `cap`."""
+    w = list(w)
+    qc, meta = inter.build_sampler(INTER_UTILITY, w, cap, k=k)
+    feas = {"".join(str(b) for b in reversed(bits)): s
+            for bits, s in inter.enumerate_feasible(INTER_UTILITY, w, cap)}
+    return qc, meta, feas
+
+
 def cases(k=1):
     """The two problems the version-fixed files carry, as zone samplers."""
-    utility = np.array([[6.01, 3.97],
-                        [1.10, 8.36],
-                        [6.88, 2.21],
-                        [2.85, 9.11]])
-    w, cap = [1, 1, 1, 1], 2
-    qc_i, meta_i = inter.build_sampler(utility, w, cap, k=k)
-    feas_i = {"".join(str(b) for b in reversed(bits)): s
-              for bits, s in inter.enumerate_feasible(utility, w, cap)}
+    qc_i, meta_i, feas_i = inter_case(k=k)
 
     throughput = np.array([[0.42, 0.90, 0.31],
                            [0.71, 0.62, 0.18],
