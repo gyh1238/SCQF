@@ -1,0 +1,37 @@
+{
+ "case": "inter-cell, 4 UE x 2 AP, demands (7, 11, 5, 13, 9, 6), cap 31",
+ "case_key": "inter-cell_w71151396_k1_rzz",
+ "demands": [
+  7,
+  11,
+  5,
+  13,
+  9,
+  6
+ ],
+ "cap": 31,
+ "k": 1,
+ "shots": 500,
+ "backend": "qpu.forte-enterprise-1",
+ "simulator": false,
+ "job_id": "01a0bf80-fb64-74cb-96da-8183d815ab2a",
+ "submitted_utc": "2026-09-20T15:48:16.644418+00:00",
+ "logical_qubits": 22,
+ "two_qubit": 388,
+ "depth": 701,
+ "basis": "rzz",
+ "optimization_level": 3,
+ "error_mitigation": "debiasing",
+ "measure_map": [
+  0,
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7
+ ],
+ "lam": 0.1976284584980237,
+ "n_feasible": 6
+}

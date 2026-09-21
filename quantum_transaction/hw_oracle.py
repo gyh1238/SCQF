@@ -132,6 +132,10 @@ def main():
     ap.add_argument("--job", help="collect or re-score a submitted job")
     ap.add_argument("--no-wait", action="store_true",
                     help="submit, save the job ID, and return without waiting")
+    ap.add_argument("--no-dd", action="store_true",
+                    help="disable dynamical decoupling, isolating idle decoherence")
+    ap.add_argument("--seed", type=int, default=7,
+                    help="transpiler seed; different seeds give different layouts")
     a = ap.parse_args()
 
     from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2
@@ -173,8 +177,9 @@ def main():
     print("=" * 78, flush=True)
 
     for name, qc, meta, feas in todo:
-        key = case_key(name, a.k, demands)
-        isa = routed(qc, backend)
+        key = (case_key(name, a.k, demands) + ("_nodd" if a.no_dd else "")
+               + (f"_s{a.seed}" if a.seed != 7 else ""))
+        isa = routed(qc, backend, seed=a.seed)
         layout = isa.layout.final_index_layout() if isa.layout else None
         print()
         print(f"{name}   |F| = {len(feas)}   {qc.num_qubits} qubits   routed "
@@ -183,7 +188,7 @@ def main():
             continue
 
         sampler = SamplerV2(mode=backend)
-        sampler.options.dynamical_decoupling.enable = True
+        sampler.options.dynamical_decoupling.enable = not a.no_dd
         record = dict(
             case=name, case_key=key, demands=demands, cap=a.cap,
             backend=backend.name, calibration=calibration_time(backend),
@@ -191,8 +196,8 @@ def main():
             shots=a.shots, k=a.k,
             logical_qubits=qc.num_qubits, routed_2q=n2q(isa),
             routed_depth=isa.depth(), layout=layout,
-            options=dict(optimization_level=3, dynamical_decoupling=True,
-                         seed_transpiler=7),
+            options=dict(optimization_level=3,
+                         dynamical_decoupling=not a.no_dd, seed_transpiler=a.seed),
             lam=meta["lam"], n_feasible=len(feas))
         job = sampler.run([isa], shots=a.shots)
         record["job_id"] = job.job_id()

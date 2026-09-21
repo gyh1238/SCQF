@@ -184,11 +184,16 @@ INTER_UTILITY = np.array([[6.01, 3.97],
 
 
 def inter_case(w=(1, 1, 1, 1), cap=2, k=1):
-    """The inter-cell sampler at demands `w` and AP capacity `cap`."""
+    """The inter-cell sampler at demands `w` and AP capacity `cap`.
+
+    `len(w)` sets the number of UEs, which take the first rows of the utility
+    table, so a smaller circuit is a prefix of the released one.
+    """
     w = list(w)
-    qc, meta = inter.build_sampler(INTER_UTILITY, w, cap, k=k)
+    u = INTER_UTILITY[:len(w)]
+    qc, meta = inter.build_sampler(u, w, cap, k=k)
     feas = {"".join(str(b) for b in reversed(bits)): s
-            for bits, s in inter.enumerate_feasible(INTER_UTILITY, w, cap)}
+            for bits, s in inter.enumerate_feasible(u, w, cap)}
     return qc, meta, feas
 
 

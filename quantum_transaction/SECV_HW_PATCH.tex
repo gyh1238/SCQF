@@ -1,0 +1,147 @@
+% =====================================================================
+% Section V edits carrying the hardware runs of HW_RUNS.md into the draft.
+% Each block says where it goes and what it replaces.  Numbers are from
+% hw_runs/; SECV_HW_TEXT.md says which measurement backs which sentence.
+% =====================================================================
+
+
+% ---------------------------------------------------------------------
+% [1] V-A, Digital twin testbed.  Replaces the sentence ending
+%     "...reducing the expected sampling cost by a factor of approximately
+%     nine for k=1."   (P_z(k)/mu_z is 5.9 as measured; 9 is the mu->0 bound.)
+% ---------------------------------------------------------------------
+For small $\mu_z$, \eqref{eq:success} gives $P_z(k)\simeq(2k+1)^2\mu_z$, so
+$(2k+1)^2=9$ bounds the reduction in sampling cost at $k=1$; the ratio
+$P_z(k)/\mu_z$ measured over the zones of this evaluation is $5.9$.
+
+
+% ---------------------------------------------------------------------
+% [2] V-B.  New paragraph, placed after the simulated-noise discussion and
+%     before the routing paragraph.  This is the passage that carries the
+%     hardware claim of the abstract, Sec. I and the conclusion.
+% ---------------------------------------------------------------------
+The same construction is executed on quantum processors: the superconducting
+devices ibm\_boston and ibm\_kingston, and the trapped-ion device IonQ Forte
+Enterprise, whose all-to-all connectivity needs no routing and executes the
+inter-cell circuit in $196$ two-qubit gates against $787$ after routing onto a
+heavy-hex lattice. Every reported assignment satisfies the original
+constraints on every device and in every run, since the acceptance test of
+Section~\ref{sec:distribution} is applied to the decoded assignment rather
+than to the internal flags. Without amplification, ibm\_boston reproduces the
+accepted law of \eqref{eq:conditional-exponential} across six demand settings:
+over $10{,}000$ shots the distance to the exact law is $0.024$ to $0.049$,
+acceptance lands within $0.92$ to $1.08$ of its exact value, and an accepted
+sample carries $0.83$ to $0.90$ of $J^\star$ against an exact $0.84$ to $0.91$.
+The utility rotations and the decoded acceptance test therefore operate as
+intended on a device.
+
+Amplification is bounded by circuit size rather than by the construction. The
+marked branch decays by $0.0022$ to $0.0042$ per routed two-qubit gate over
+circuits of $364$ to $1868$ gates, which places the break-even of one round
+near $400$ routed gates: a three-UE circuit of $364$ gates raises acceptance
+from $0.298$ without amplification to $0.337$ with it, whereas circuits of
+$580$ gates and above stay below their own baselines. Selection survives well
+past that point. At $1868$ routed gates, half the partition budget in the
+counting of \eqref{eq:zone_one_pass_cost}, the surviving signal is $1.5\%$ and
+the optimal assignment still holds $0.222$ of the accepted mass against
+$0.016$ for a random output. Five physical layouts of that circuit agree
+within $0.209$ to $0.251$. Job identifiers, device settings and raw counts are
+provided in \cite{scqfrepo}.
+
+
+% ---------------------------------------------------------------------
+% [3] V-B, routing paragraph.  Append to the sentence that says the budget
+%     counts logical oracle gates before routing.
+% ---------------------------------------------------------------------
+The decay measured above places the break-even of one amplification round near
+$355$ gates in this counting on a present device, so the budget bounds the
+circuit a zone must fit into rather than the size at which a present device
+returns an undistorted accepted law; it is met in qubit width, which the zone
+circuits of Section~\ref{subsec:eval_network} occupy at $37.7$ to $43.0$
+qubits against the $156$ of the devices used here.
+
+
+% ---------------------------------------------------------------------
+% [4] V-B, after the simulated-noise table.  What the noise sweep does and
+%     does not cover.
+% ---------------------------------------------------------------------
+These conditions model gate and readout errors. Measured against the hardware
+runs, a noise model carrying the device's own gate errors overestimates the
+surviving signal by a factor of $3.4$ at $364$ routed gates and $55$ at
+$1868$, because the loss that grows with circuit size is the idling of qubits
+through a deep circuit rather than the gates themselves. The sweep therefore
+characterizes the effect of gate errors, and the hardware runs the operating
+point.
+
+
+% ---------------------------------------------------------------------
+% [5] V-D, after the sentence "Parallel counters reduce the accumulation
+%     depth, while the remaining constraint and assignment operations set a
+%     floor on the achievable latency."
+% ---------------------------------------------------------------------
+Depth is also what limits the executable size on present hardware: the
+$787$-gate circuit of Section~\ref{subsec:eval_local_law} loses its entire
+marked branch, from an acceptance of $0.125$ to $0.034$, when dynamical
+decoupling is disabled and its qubits idle through the same depth. Reducing
+the accumulation depth is therefore a present-device measure as well as a
+latency one.
+
+
+% ---------------------------------------------------------------------
+% [6] Table caption fix, V-B noise table.
+%     Was: "...with 2000 shots per condition..."
+% ---------------------------------------------------------------------
+\caption{Inter-cell circuit under simulated noise, with 10\,000 shots per
+condition and one amplification round. TVD is computed after the decoded
+feasibility check.}
+
+
+% ---------------------------------------------------------------------
+% [7] Optional table for V-B, if the hardware runs are given their own float
+%     rather than only prose.
+% ---------------------------------------------------------------------
+\begin{table}[!t]
+\centering
+\caption{Hardware execution on ibm\_boston, $10{,}000$ shots per row. The
+$k=0$ rows carry no oracle and test the accepted law; the $k=1$ rows add one
+amplification round. Exact values are in parentheses.}
+\label{tab:eval_hardware}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lrrrr}
+\toprule
+Circuit & 2q gates & Acceptance & TVD & $P(\text{opt})$ \\
+\midrule
+$k=0$, unit demands        &    8 & 0.100 (0.098) & 0.030 & 0.609 (0.632) \\
+$k=0$, demands $(1,2,1,2)$ &    8 & 0.138 (0.141) & 0.049 & 0.436 (0.444) \\
+$k=0$, six UEs             &    8 & 0.139 (0.149) & 0.028 & 0.431 (0.423) \\
+$k=1$, three UEs           &  364 & 0.337 (0.985) & 0.106 & 0.373 (0.436) \\
+$k=1$, demands $(1,2,1,2)$ &  787 & 0.125 (0.838) & 0.159 & 0.299 (0.444) \\
+$k=1$, six UEs             & 1868 & 0.036 (0.860) & 0.248 & 0.222 (0.423) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+% ---------------------------------------------------------------------
+% [8] Abstract, one word of scope.  The reconstruction claim holds on
+%     hardware for the unamplified sampler; leaving it unqualified invites
+%     the question the repository answers.
+%     Was: "...exact constraint satisfaction, reconstruction of the
+%     distribution over feasible assignments, and scalable coordination..."
+% ---------------------------------------------------------------------
+The results verify exact constraint satisfaction on every simulated and
+executed circuit, reconstruction of the distribution over feasible
+assignments, and scalable coordination, and establish a practical foundation
+for applying a common quantum computational framework to diverse and coupled
+network management tasks.
+
+
+% ---------------------------------------------------------------------
+% [9] Sec. I, naming the devices costs four words and answers the first
+%     question a reviewer asks.
+%     Was: "The proposed quantum algorithm is executed on a real NISQ
+%     processor to verify its operation and exact constraint satisfaction."
+% ---------------------------------------------------------------------
+The proposed quantum algorithm is executed on superconducting and trapped-ion
+processors to verify its operation and exact constraint satisfaction.

@@ -1,14 +1,13 @@
 # Hardware results as manuscript text
 
-Replacement wording for the passages that claim quantum-processor execution,
-written against the runs recorded in [HW_RUNS.md](HW_RUNS.md). Each snippet is
-followed by the measurement it rests on, so a reviewer's question can be
-answered from a stored job rather than from memory.
+What the runs in [HW_RUNS.md](HW_RUNS.md) let Sec. V say, and the edits that
+say it. The LaTeX is in [SECV_HW_PATCH.tex](SECV_HW_PATCH.tex), numbered to
+match the list below.
 
-The draft already claims hardware execution in four places — the abstract,
-Sec. I, the third contribution and the conclusion — and Table I marks
-"Gate-level QPU demo" for the proposed method. Those claims are now backed;
-what changes is *what* they claim.
+The draft claims hardware execution in four places - the abstract, Sec. I, the
+third contribution and the conclusion - and Table I marks "Gate-level QPU
+demo" for the proposed method. Those claims are now backed by 18 runs on three
+devices. What changes is what they claim.
 
 ---
 
@@ -16,134 +15,82 @@ what changes is *what* they claim.
 
 | claim | status |
 |---|---|
-| The circuits were executed on real quantum processors | **yes** — ibm_kingston, ibm_boston, IonQ Forte Enterprise |
-| Every reported assignment satisfies the constraints | **yes**, on every device |
-| The accepted law of \eqref{eq:conditional-exponential} is reproduced on hardware | **yes at k=0**: TVD 0.030 and 0.049 over 10 000 shots on ibm_boston |
-| The optimal assignment is the most frequent report | **yes**, on every device, amplified or not |
-| Hardware selects a zone assignment at near-exact quality | **yes**, under IonQ's debiased aggregation: P(opt) 0.46 against 0.444 exactly |
-| One amplification round raises acceptance on hardware | **no** — 0.125 against 0.138 at k=0 on ibm_boston |
-| The full oracle circuit reproduces the accepted law on hardware | **no** — TVD 0.159 at best (ibm_boston, unequal demands) |
+| The circuits were executed on real quantum processors | **yes** - ibm_boston, ibm_kingston, IonQ Forte Enterprise |
+| Every reported assignment satisfies the constraints | **yes**, every device, every run |
+| The accepted law of Eq. (36) is reproduced on hardware | **yes without amplification**: TVD 0.024-0.049 over six settings on ibm_boston |
+| The optimal assignment is the most frequent report | **yes**, amplified or not, up to 1868 routed gates |
+| One amplification round raises acceptance on hardware | **yes below ~400 routed gates** (0.337 against 0.298 at 364); no above |
+| The full oracle reproduces the accepted law on hardware | **no** - TVD 0.159 at best, 0.248 at zone-half scale |
+| The 2000-gate budget is executable today with an undistorted law | **no** - the measured break-even is ~355 gates in that counting |
+| Error-mitigated aggregation would rescue the larger circuits | **no** - majority voting over five layouts moves P(opt) 0.229 to 0.234 |
 
-Two numbers must never be quoted as performance: IonQ's **sharpened
-acceptance of 0.927**, which exceeds the noise-free 0.836 and is an artefact
-of the aggregation, and the **sharpened TVD**, which does not measure the
-accepted law. Use P(opt) and mean utility for sharpened output.
-
----
-
-## Sec. V-B, replacing the quantum-processor paragraph
-
-> Selected circuits are further executed on quantum processors: the
-> superconducting devices ibm\_kingston and ibm\_boston, and the trapped-ion
-> device IonQ Forte Enterprise, whose all-to-all connectivity requires no
-> routing and executes the inter-cell circuit in $196$ two-qubit gates against
-> $787$ after routing onto a heavy-hex lattice. Every reported assignment
-> satisfies the original constraints on every device, since the acceptance
-> test of Section \ref{sec:distribution} is applied to the decoded assignment
-> rather than to the internal flags. Without amplification, ibm\_boston
-> reproduces the accepted law of \eqref{eq:conditional-exponential}: over
-> $10{,}000$ shots its distance to the exact law is $0.030$ for unit demands
-> and $0.049$ for demands $(1,2,1,2)$, the optimal assignment is reported with
-> probability $0.609$ against $0.632$ exactly, and an accepted sample carries
-> $0.870\,J^\star$ against $0.878\,J^\star$. One amplification round adds
-> $787$ two-qubit gates, and at present error rates the round costs more
-> acceptance than it returns, so the accepted law is flattened; the selection
-> the sampler is meant to make nonetheless survives, and under the debiased
-> aggregation IonQ applies to trapped-ion jobs the optimum is reported with
-> probability $0.46$ against $0.444$ exactly, an accepted sample carrying
-> $0.806\,J^\star$. Job identifiers, device settings, transpiled gate counts
-> and raw counts are provided in \cite{scqfrepo}.
-
-Rests on: the six hardware rows of HW_RUNS.md, and the aggregation comparison
-of job `01a0b994-…`.
-
-**If a shorter paragraph is wanted**, the last sentence before the citation
-can be dropped; the amplification sentence should not be, because the
-repository publishes both the k=0 and k=1 runs.
+Two numbers must never be quoted as performance: IonQ's **sharpened acceptance
+of 0.927**, which exceeds the noise-free 0.836 and is an artefact of the
+aggregation, and the **sharpened TVD**, which does not measure the accepted
+law.
 
 ---
 
-## Table row for the noise table
+## The edits
 
-The noise table of Sec. V-B reports the simulated conditions. One hardware row
-per device, with the same two columns, extends it:
+1. **V-A**, the ninefold sentence. The bound is 9; the measured ratio is 5.9.
+   Independent of the hardware work, but wrong as written.
+2. **V-B**, new hardware paragraph (two paragraphs in the patch). The claim
+   the abstract and Sec. I rest on.
+3. **V-B**, routing paragraph. One clause on what the budget bounds: the
+   circuit a zone must fit into, met in qubit width (37.7-43.0 against 156),
+   not the size at which a present device returns an undistorted law.
+4. **V-B**, after the simulated-noise table. The sweep models gate errors; it
+   overestimates the surviving signal by 3.4x to 55x against the runs, because
+   idling is what grows with size.
+5. **V-D**, after the parallel-counter sentence. The DD result makes depth
+   reduction a present-device measure, not only a latency one.
+6. **Table caption**, V-B noise table: 2000 shots -> 10 000, which is what
+   `noise_oracle.py` runs.
+7. **Optional table** for the hardware runs, if they get their own float.
+8. **Abstract**, scope of the reconstruction claim.
+9. **Sec. I**, name the device families.
 
-```latex
-\midrule
-ibm\_boston, no amplification$^b$ & 0.100 & 0.030 \\
-ibm\_boston, one round$^b$        & 0.055 & 0.269 \\
-IonQ Forte Enterprise$^{b,c}$     & 0.099 & 0.257 \\
-```
+Unchanged: V-C, V-E and their numbers; the partition budget of 2000; Table I;
+the conclusion. The brown draft already carries the V-C and V-E corrections.
 
-with the footnotes
+## Why the budget is not restated
 
-```latex
-$^b$Measured on hardware; the simulated rows above use the unrouted circuit,
-whereas a hardware run executes the routed one ($767$ two-qubit gates on
-ibm\_boston, $196$ on IonQ).
-$^c$Debiased, averaged aggregation. Under the plurality aggregation the same
-job reports the optimum with probability $0.46$; see \cite{scqfrepo}.
-```
-
-The simulated and hardware rows are not the same circuit, which is why the
-footnote is needed: comparing them directly would mix gate noise with routing.
-
----
-
-## Abstract, Sec. I and the conclusion
-
-These three passages already say the algorithm runs on hardware. Keep them,
-and let them say what was measured:
-
-* **Abstract.** "quantum hardware execution" stands. If the sentence lists
-  what the results verify, keep "exact constraint satisfaction" (hardware
-  supports it) and attach "reconstruction of the distribution over feasible
-  assignments" to the simulation results, since on hardware it holds for the
-  unamplified sampler only.
-* **Sec. I.** "executed on a real NISQ processor" stands. Naming the devices
-  costs four words and answers the first question a reviewer asks:
-  "is executed on superconducting and trapped-ion processors".
-* **Third contribution.** "executed on a real quantum processor to verify its
-  operation under actual hardware conditions" stands as written.
-* **Conclusion.** "Qiskit-based simulations and quantum-processor experiments"
-  stands.
-
-## Table I
-
-"Gate-level QPU demo: $\bigcirc$" for the proposed method is now backed by
-executions on three devices across two qubit technologies. No change.
+Lowering it does not produce smaller circuits. The partition's atom is one AP
+with its UEs, which already costs 686 to 1854 gates in the counting of
+Eq. (39) on the campus instance, so a budget below about 1000 returns the same
+one-AP-per-zone partition. Measured on that finest partition, coordination
+still reaches 98.1-98.6% of $J^\star$ against 99.6% at the 2000-gate budget,
+which is the sensitivity worth reporting if a reviewer asks what the budget
+buys.
 
 ---
 
 ## Answers to the questions a reviewer is likely to ask
 
-**"Which circuit was executed?"** The inter-cell test circuit of Sec. V-B:
-four UEs, two APs, $\mathcal{C}_z=\mathcal{G}_z\mathcal{P}_z$ with one
-amplification round, plus the same circuit without amplification. It is not a
-zone of the campus instance, and with two APs it decides both capacity
-constraints from one counter and a two-sided comparison rather than the
-general per-AP accumulation of Fig. \ref{fig:oracle-capacity}. HW_RUNS.md says
-so in its first section.
+**"Which circuit was executed?"** The inter-cell test circuit of Sec. V-B, at
+three to six UEs, with and without one amplification round. It is not a zone
+of the campus instance, and with two APs it decides both capacity constraints
+from one counter and a two-sided comparison rather than the general per-AP
+accumulation of Fig. 6. HW_RUNS.md says so in its first section.
 
-**"Why is the amplified acceptance below the unamplified one?"** Because at
-$767$–$787$ two-qubit gates present error rates remove more of the marked
-branch than one round adds. The k=0 rows, which reach their exact values on
-the same device, locate the loss in the oracle rather than in the sampler or
-the readout.
+**"Why is the amplified acceptance below the unamplified one at 787 gates?"**
+Because the round costs more of the marked branch than it adds at that size.
+The k=0 rows, which reach their exact values on the same device, place the
+loss in the oracle rather than in the sampler or the readout, and the 364-gate
+circuit shows the round paying off below the break-even.
 
-**"Is the IonQ number produced by post-processing?"** Partly, and the
-repository publishes both aggregations of the same job. The averaged
-aggregation is the device's own law (acceptance 0.099, TVD 0.257); the
-plurality aggregation is what IonQ applies to debiased jobs and is quoted only
-through P(opt) and mean utility, never through acceptance.
+**"Does the 2000-gate budget hold on these devices?"** Not for reproducing the
+accepted law: the measured break-even is about 355 gates in that counting, and
+about 519 with the parallel-counter schedule of Sec. V-D. It holds for what it
+is used for, bounding the circuit each zone must fit, and selection survives
+to at least half the budget.
 
-**"Does the 2000-gate partition budget hold on these devices?"** No, and the
-paper should not imply it. The measured decay for the executed circuit is
-about $0.0042$ per two-qubit gate on ibm_kingston, against the $0.00118$ that
-`model_cost.py` assumes; the budget is a fault-tolerant-era target, consistent
-with the timing model of Sec. V-D. HW_RUNS.md records the discrepancy.
+**"Is any of this error mitigation?"** Dynamical decoupling is on, and it
+matters: disabling it costs the 787-gate circuit its whole marked branch. No
+other mitigation is used on IBM. The IonQ run was debiased, and the repository
+publishes both of its aggregations.
 
 **"Why 500 shots on IonQ and 10 000 on IBM?"** IonQ bills by shot. At 500
-shots the sampling floor on the accepted law is about 0.05, and the acceptance
-estimate carries $\pm 0.03$; both are small against the effects being
-reported.
+shots the sampling floor on the accepted law is about 0.05 and the acceptance
+estimate carries +-0.03, both small against the effects reported.
