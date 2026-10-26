@@ -96,6 +96,18 @@ COL = dict(ratio="#1f6fb4", zone="#2e8b57", cen="#c1440e")
 
 PANEL_DIR = "fig/panels"
 
+# The figure is drawn at the one-column width it is printed at (IEEE, 3.5 in),
+# so every size below is the size on paper.  Drawn twice as wide and scaled
+# down, the old 7.5-10 pt type printed at 4-5 pt.
+FIG_W = 3.5
+FS_LABEL = 8.0       # axis labels
+FS_TICK = 7.5
+FS_LEGEND = 7.0
+FS_NOTE = 7.0        # in-panel annotations
+FS_LETTER = 8.5
+MS = 3.6             # marker size
+LW = 1.3
+
 
 def _save(fig, stem, formats=("pdf", "svg", "png"), **kw):
     """Every output is written on a transparent background."""
@@ -123,7 +135,7 @@ def _ylabel(ax, concept, metric):
     three claims the panel is carrying; one reading "circuit complexity" hides
     what was counted.  Both lines together cost nothing and answer both.
     """
-    ax.set_ylabel(f"{concept}\n{metric}", fontsize=9.5, linespacing=1.6)
+    ax.set_ylabel(f"{concept}\n{metric}", fontsize=FS_LABEL, linespacing=1.3)
 
 
 def _letter(ax, letter):
@@ -133,85 +145,94 @@ def _letter(ax, letter):
     axes, where the two-line y labels already take the margin.
     """
     ax.text(0.012, 0.975, f"({letter})", transform=ax.transAxes, ha="left",
-            va="top", fontsize=10, fontweight="bold", zorder=10)
+            va="top", fontsize=FS_LETTER, fontweight="bold", zorder=10)
 
 
 def panel_cost(ax, x, z2q, z2lo, z2hi, c2q, standalone=False):
     """(a) two-qubit gates of one oracle pass: centralized against per zone."""
     ax.set_yscale("log")
-    ax.axhline(BUDGET_DEFAULT, color=COL["zone"], ls="--", lw=1.0,
+    ax.axhline(BUDGET_DEFAULT, color=COL["zone"], ls="--", lw=0.9,
                dashes=(4, 3), alpha=0.9)
-    ax.text(x[-1], BUDGET_DEFAULT * 1.18, f"partition budget {BUDGET_DEFAULT}",
-            ha="right", va="bottom", fontsize=7, color=COL["zone"])
+    ax.text(x[-1], BUDGET_DEFAULT * 1.25, f"budget {BUDGET_DEFAULT}",
+            ha="right", va="bottom", fontsize=FS_NOTE, color=COL["zone"])
 
-    ax.plot(x, c2q, "s--", color=COL["cen"], ms=5, lw=1.8,
-            label="centralized: one circuit for the whole region")
+    ax.plot(x, c2q, "s--", color=COL["cen"], ms=MS, lw=LW,
+            label="centralized: whole region")
     ax.fill_between(x, z2lo, z2hi, color=_tint(COL["zone"], 0.20), lw=0)
-    ax.plot(x, z2q, "o-", color=COL["zone"], ms=5, lw=1.8,
-            label="distributed: largest zone circuit")
-    ax.annotate(f"×{c2q[-1]/c2q[0]:.0f} across this range", (x[-1], c2q[-1]),
-                textcoords="offset points", xytext=(-6, 8), ha="right",
-                fontsize=7.5, color=COL["cen"])
+    ax.plot(x, z2q, "o-", color=COL["zone"], ms=MS, lw=LW,
+            label="distributed: largest zone")
+    ax.annotate(f"×{c2q[-1]/c2q[0]:.0f}", (x[-1], c2q[-1]),
+                textcoords="offset points", xytext=(-4, 6), ha="right",
+                fontsize=FS_NOTE, color=COL["cen"])
     ax.annotate(f"×{z2q[-1]/z2q[0]:.2f}", (x[-1], z2q[-1]),
-                textcoords="offset points", xytext=(-6, -13), ha="right",
-                fontsize=7.5, color=COL["zone"])
-    _ylabel(ax, "circuit complexity", "two-qubit gates, one oracle pass")
-    ax.set_ylim(min(z2q) / 3, max(c2q) * 6)
-    ax.legend(loc="upper left", bbox_to_anchor=(0.06, 1.0), fontsize=8,
-              framealpha=0.95)
-    ax.grid(alpha=0.25, which="both", lw=0.5)
+                textcoords="offset points", xytext=(-4, -11), ha="right",
+                fontsize=FS_NOTE, color=COL["zone"])
+    _ylabel(ax, "circuit complexity", "two-qubit gates per pass")
+    ax.set_ylim(min(z2q) / 3, max(c2q) * 12)
+    ax.legend(loc="upper left", bbox_to_anchor=(0.08, 1.0), fontsize=FS_LEGEND,
+              framealpha=0.95, borderpad=0.3, handlelength=1.8,
+              labelspacing=0.3)
+    ax.grid(alpha=0.25, which="both", lw=0.4)
+    ax.tick_params(labelsize=FS_TICK)
     if standalone:
-        ax.set_xlabel("zones after partitioning", fontsize=10)
+        ax.set_xlabel("zones after partitioning", fontsize=FS_LABEL)
 
 
 def panel_comm(ax, x, tot_kb, per_kb, standalone=False):
     """(b) classical coordination traffic, in total and per zone."""
     ax.set_yscale("log")
-    ax.plot(x, tot_kb, "s--", color=COL["cen"], ms=5, lw=1.8,
+    ax.plot(x, tot_kb, "s--", color=COL["cen"], ms=MS, lw=LW,
             label="whole region, one round")
-    ax.plot(x, per_kb, "o-", color=COL["zone"], ms=5, lw=1.8,
+    ax.plot(x, per_kb, "o-", color=COL["zone"], ms=MS, lw=LW,
             label="per zone")
     ax.annotate(f"×{tot_kb[-1]/tot_kb[0]:.1f} for ×{x[-1]/x[0]:.1f} zones",
                 (x[-1], tot_kb[-1]), textcoords="offset points",
-                xytext=(-6, 8), ha="right", fontsize=7.5, color=COL["cen"])
+                xytext=(-4, 6), ha="right", fontsize=FS_NOTE, color=COL["cen"])
     ax.annotate(f"×{per_kb[-1]/per_kb[0]:.2f}", (x[-1], per_kb[-1]),
-                textcoords="offset points", xytext=(-6, -13), ha="right",
-                fontsize=7.5, color=COL["zone"])
+                textcoords="offset points", xytext=(-4, -11), ha="right",
+                fontsize=FS_NOTE, color=COL["zone"])
     _ylabel(ax, "communication volume", "coordination traffic [kB]")
-    ax.set_ylim(min(per_kb) / 3, max(tot_kb) * 6)
-    ax.legend(loc="upper left", bbox_to_anchor=(0.06, 1.0), fontsize=8,
-              framealpha=0.95)
-    ax.grid(alpha=0.25, which="both", lw=0.5)
+    ax.set_ylim(min(per_kb) / 3, max(tot_kb) * 12)
+    ax.legend(loc="upper left", bbox_to_anchor=(0.08, 1.0), fontsize=FS_LEGEND,
+              framealpha=0.95, borderpad=0.3, handlelength=1.8,
+              labelspacing=0.3)
+    ax.grid(alpha=0.25, which="both", lw=0.4)
+    ax.tick_params(labelsize=FS_TICK)
     if standalone:
-        ax.set_xlabel("zones after partitioning", fontsize=10)
+        ax.set_xlabel("zones after partitioning", fontsize=FS_LABEL)
 
 
 def panel_quality(ax, x, ratio, rlo, rhi, n_ues, standalone=False):
     """(c) distributed utility as a fraction of the centralized strict optimum."""
-    ax.axhline(100, color="#999999", lw=0.9, ls="-")
-    ax.fill_between(x, rlo, rhi, color=_tint(COL["ratio"], 0.22), lw=0)
-    ax.plot(x, ratio, "^-", color=COL["ratio"], ms=6, lw=2.0,
-            label="distributed utility / centralized strict optimum")
-    ax.text(x[-1], 99.75, "100 % = centralized optimum", ha="right",
-            va="top", fontsize=7, color="#777777")
+    ax.axhline(100, color="#999999", lw=0.8, ls="-")
+    ax.fill_between(x, rlo, rhi, color=_tint(COL["ratio"], 0.22), lw=0,
+                    label="range over instances")
+    ax.plot(x, ratio, "^-", color=COL["ratio"], ms=MS + 0.6, lw=LW,
+            label="mean")
+    ax.text(x[-1], 100.12, "centralized optimum", ha="right",
+            va="bottom", fontsize=FS_NOTE, color="#666666")
     # every instance lies above 96.7 %, so 90-95 was empty axis; the headroom
     # above 100 keeps the panel letter off the reference line
-    ax.set_ylim(95, 100.8)
+    ax.set_ylim(95, 100.9)
     ax.set_yticks([95, 96, 97, 98, 99, 100])
-    _ylabel(ax, "solution accuracy", "utility vs. centralized optimum [%]")
-    ax.legend(loc="lower left", bbox_to_anchor=(0.06, 0.0), fontsize=8,
-              framealpha=0.95)
-    ax.grid(alpha=0.25, lw=0.5)
+    _ylabel(ax, "solution accuracy", r"$J/J^{\star}$ [%]")
+    ax.legend(loc="lower left", bbox_to_anchor=(0.08, 0.0), fontsize=FS_LEGEND,
+              framealpha=0.95, borderpad=0.3, handlelength=1.8,
+              labelspacing=0.3, ncol=2, columnspacing=1.0)
+    ax.grid(alpha=0.25, lw=0.4)
+    ax.tick_params(labelsize=FS_TICK)
     ax.set_xticks(x)
     ax.set_xticklabels([f"{xi:.0f}\n{nu:.0f}" for xi, nu in zip(x, n_ues)],
-                       fontsize=8.5)
-    # two bare rows of numbers do not say which row is which
-    ax.annotate("zones", (-0.015, -0.030), xycoords="axes fraction",
-                ha="right", va="top", fontsize=8.5, color="#555555")
-    ax.annotate("UEs", (-0.015, -0.098), xycoords="axes fraction",
-                ha="right", va="top", fontsize=8.5, color="#555555")
-    ax.set_xlabel("region size, in zones produced and UEs covered",
-                  fontsize=10, labelpad=6)
+                       fontsize=FS_TICK)
+    # two bare rows of numbers do not say which row is which; placed in points
+    # from the axis so they stay level with the tick rows at any figure size
+    line = FS_TICK * 1.2
+    for j, word in enumerate(("zones", "UEs")):
+        ax.annotate(word, (0, 0), xycoords="axes fraction",
+                    xytext=(-4, -7 - j * line), textcoords="offset points",
+                    ha="right", va="top", fontsize=FS_TICK, color="#555555")
+    ax.set_xlabel("region size: zones produced, UEs covered",
+                  fontsize=FS_LABEL, labelpad=4)
 
 
 def plot(arr, skipped):
@@ -245,7 +266,7 @@ def plot(arr, skipped):
     per_kb = tot_kb / x
 
     fig, (ax_c, ax_m, ax_q) = plt.subplots(
-        3, 1, figsize=(6.9, 8.0), sharex=True,
+        3, 1, figsize=(FIG_W, 5.2), sharex=True,
         gridspec_kw=dict(height_ratios=[1.15, 1.15, 1]))
     panel_cost(ax_c, x, z2q, z2lo, z2hi, c2q)
     panel_comm(ax_m, x, tot_kb, per_kb)
@@ -256,8 +277,8 @@ def plot(arr, skipped):
     # No title and no caption block: both belong to the document that places
     # the figure, and the numbers are printed to stdout and kept in
     # fig/README.md.
-    fig.subplots_adjust(left=0.145, right=0.98, top=0.985, bottom=0.115,
-                        hspace=0.14)
+    fig.subplots_adjust(left=0.205, right=0.975, top=0.99, bottom=0.115,
+                        hspace=0.12)
     os.makedirs("fig", exist_ok=True)
     _save(fig, "fig/fig_scaling", formats=("pdf", "png"), dpi=200)
     plt.close(fig)
@@ -278,7 +299,7 @@ def plot(arr, skipped):
          lambda ax: panel_quality(ax, x, ratio, rlo, rhi, n_ues, standalone=True)),
     ]
     for stem, draw in specs:
-        f, a = plt.subplots(figsize=(5.4, 3.4))
+        f, a = plt.subplots(figsize=(FIG_W, 2.2))
         draw(a)
         _letter(a, stem.split("_")[1])   # the letter the file is named for
         f.tight_layout()

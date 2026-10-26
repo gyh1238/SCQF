@@ -158,25 +158,27 @@ def draw(output_dir: Path) -> tuple[Path, Path]:
         "QTG": first_crossover(n_values, qtg, classical),
     }
 
+    # Drawn at the one-column width it is printed at (IEEE, 3.5 in), so every
+    # size here is the size on paper.  The axes are cropped to the decade in
+    # which the four crossovers fall, which is what the figure is read for.
     plt.rcParams.update(
         {
             "font.family": "DejaVu Sans",
-            "font.size": 10.4,
-            "axes.labelsize": 12,
-            "axes.titlesize": 13.2,
-            "legend.fontsize": 9.2,
-            "xtick.labelsize": 10,
-            "ytick.labelsize": 10,
+            "font.size": 7.5,
+            "axes.labelsize": 8,
+            "legend.fontsize": 7,
+            "xtick.labelsize": 7.5,
+            "ytick.labelsize": 7.5,
             "mathtext.fontset": "dejavusans",
-            "axes.linewidth": 1.0,
+            "axes.linewidth": 0.8,
         }
     )
 
-    fig, ax = plt.subplots(figsize=(10.8, 5.8))
+    fig, ax = plt.subplots(figsize=(3.5, 2.75))
     ax.set_xscale("log")
     ax.set_yscale("log")
-    ax.set_xlim(3.0, 1000.0)
-    ax.set_ylim(3.0e-8, 2.0e-2)
+    ax.set_xlim(8.0, 80.0)
+    ax.set_ylim(2.0e-7, 2.5e-3)      # headroom: the legend sits above every curve
 
     colors = {
         "Proposed, serial": "#1769AA",
@@ -186,95 +188,40 @@ def draw(output_dir: Path) -> tuple[Path, Path]:
         "Classical": "#D62728",
     }
 
-    ax.plot(
-        n_values,
-        proposed_serial,
-        color=colors["Proposed, serial"],
-        linewidth=2.7,
-        label="Proposed serial",
-        zorder=4,
-    )
-    ax.plot(
-        n_values,
-        proposed_enhanced,
-        color=colors["Proposed, enhanced"],
-        linewidth=2.5,
-        linestyle=(0, (7, 3)),
-        label=r"Proposed enhanced ($Q^{\mathrm{cnt}}=3$, $R_{\mathrm{cnt}}=4$)",
-        zorder=4,
-    )
-    ax.plot(
-        n_values,
-        gas,
-        color=colors["GAS"],
-        linewidth=2.5,
-        label="GAS",
-        zorder=3,
-    )
-    ax.plot(
-        n_values,
-        qtg,
-        color=colors["QTG"],
-        linewidth=2.5,
-        label="QTG",
-        zorder=3,
-    )
-    ax.plot(
-        n_values,
-        classical,
-        color=colors["Classical"],
-        linewidth=2.9,
-        label=r"Classical: $0.400N_z^3$ ns",
-        zorder=2,
-    )
+    ax.plot(n_values, proposed_serial, color=colors["Proposed, serial"],
+            linewidth=1.5, label="Proposed serial", zorder=4)
+    ax.plot(n_values, proposed_enhanced, color=colors["Proposed, enhanced"],
+            linewidth=1.5, linestyle=(0, (5, 2)),
+            label=r"Proposed enhanced ($Q^{\mathrm{cnt}}=3$, $R_{\mathrm{cnt}}=4$)",
+            zorder=4)
+    ax.plot(n_values, gas, color=colors["GAS"], linewidth=1.5, label="GAS",
+            zorder=3)
+    ax.plot(n_values, qtg, color=colors["QTG"], linewidth=1.5, label="QTG",
+            zorder=3)
+    ax.plot(n_values, classical, color=colors["Classical"], linewidth=1.8,
+            label=r"Classical: $0.400N_z^3$ ns", zorder=2)
 
+    # Each crossover is marked on its curve and its N_z written along its
+    # dashed line, at the bottom of the axes where no curve runs, so the value
+    # sits next to the point it belongs to instead of in a separate box.
     for name, crossing in crossovers.items():
         color = colors[name]
         y_cross = float(classical_seconds(np.array([crossing]))[0])
-        ax.axvline(
-            crossing,
-            color=color,
-            linewidth=1.1,
-            linestyle=(0, (4, 4)),
-            alpha=0.72,
-            zorder=1,
-        )
-        ax.scatter(
-            [crossing],
-            [y_cross],
-            s=46,
-            facecolor="white",
-            edgecolor=color,
-            linewidth=1.8,
-            zorder=7,
-        )
-    crossover_text = (
-        "Modeled crossover $N_z$\n"
-        f"Proposed enhanced: {crossovers['Proposed, enhanced']:.1f}\n"
-        f"Proposed serial: {crossovers['Proposed, serial']:.1f}\n"
-        f"GAS: {crossovers['GAS']:.1f}\n"
-        f"QTG: {crossovers['QTG']:.1f}"
-    )
-    ax.text(
-        0.982,
-        0.965,
-        crossover_text,
-        transform=ax.transAxes,
-        ha="right",
-        va="top",
-        fontsize=9.2,
-        color="#3F3F3F",
-        linespacing=1.35,
-        bbox=dict(
-            boxstyle="round,pad=0.42",
-            facecolor="white",
-            edgecolor="#999999",
-            alpha=0.94,
-        ),
-    )
+        ax.axvline(crossing, color=color, linewidth=0.8,
+                   linestyle=(0, (3, 3)), alpha=0.8, zorder=1)
+        ax.scatter([crossing], [y_cross], s=22, facecolor="white",
+                   edgecolor=color, linewidth=1.2, zorder=7)
+        ax.annotate(f"{crossing:.1f}", (crossing, 2.6e-7),
+                    xytext=(-2, 0), textcoords="offset points", rotation=90,
+                    ha="right", va="bottom", fontsize=7, color=color,
+                    fontweight="bold")
 
     ax.set_xlabel(r"Zone size $N_z$ (UEs)")
     ax.set_ylabel("Modeled logical latency (s)")
+    ticks = [8, 10, 20, 30, 40, 50, 80]
+    ax.xaxis.set_major_locator(FixedLocator(ticks))
+    ax.xaxis.set_major_formatter(ScalarFormatter())
+    ax.xaxis.set_minor_formatter(NullFormatter())
 
     top_axis = ax.secondary_xaxis(
         "top",
@@ -283,38 +230,28 @@ def draw(output_dir: Path) -> tuple[Path, Path]:
             lambda d: d / CANDIDATES_PER_UE,
         ),
     )
-    top_axis.set_xlabel(r"Candidate-edge count $D_z=2N_z$")
+    top_axis.set_xlabel(r"Candidate-edge count $D_z=2N_z$", labelpad=3)
+    top_axis.xaxis.set_major_locator(FixedLocator([20, 40, 60, 100, 160]))
+    top_axis.xaxis.set_major_formatter(ScalarFormatter())
+    top_axis.xaxis.set_minor_formatter(NullFormatter())
+    top_axis.tick_params(labelsize=7.5)
 
-    ax.grid(
-        which="major",
-        color="#A9A9A9",
-        linestyle=":",
-        linewidth=0.85,
-        alpha=0.78,
-    )
-    ax.grid(
-        which="minor",
-        color="#D5D5D5",
-        linestyle=":",
-        linewidth=0.55,
-        alpha=0.62,
-    )
+    ax.grid(which="major", color="#A9A9A9", linestyle=":", linewidth=0.6,
+            alpha=0.8)
+    ax.grid(which="minor", axis="y", color="#D5D5D5", linestyle=":",
+            linewidth=0.4, alpha=0.6)
 
-    legend = ax.legend(
-        loc="upper left",
-        bbox_to_anchor=(0.012, 0.982),
-        frameon=True,
-        fancybox=True,
-        framealpha=0.96,
-        borderpad=0.65,
-    )
+    legend = ax.legend(loc="upper left", frameon=True, framealpha=0.95,
+                       borderpad=0.35, handlelength=2.0, labelspacing=0.25,
+                       borderaxespad=0.3)
     legend.get_frame().set_edgecolor("#999999")
+    legend.get_frame().set_linewidth(0.6)
 
-    fig.tight_layout(rect=(0.015, 0.025, 0.995, 0.98))
+    fig.tight_layout(pad=0.2)
 
     png_path = output_dir / "qtg_assignment_runtime_comparison.png"
     pdf_path = output_dir / "qtg_assignment_runtime_comparison.pdf"
-    fig.savefig(png_path, dpi=300, bbox_inches="tight", facecolor="white")
+    fig.savefig(png_path, dpi=400, bbox_inches="tight", facecolor="white")
     fig.savefig(pdf_path, bbox_inches="tight", facecolor="white")
     plt.close(fig)
 
