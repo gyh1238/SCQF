@@ -1,6 +1,6 @@
 \begin{table}[!t]
 \centering
-\caption{Execution on quantum processors; exact values in parentheses. Shots: $10{,}000$ per IBM row and $500$ for IonQ. Gates: two-qubit gate count after routing, or native count on IonQ, whose all-to-all connectivity needs no routing; $P(\mathrm{opt})$: probability that an accepted sample is optimal; DD: dynamical decoupling.}
+\caption{Execution on quantum processors; exact values in parentheses. Shots: $10{,}000$ per IBM row and $500$ for IonQ. Gates: two-qubit gate count after routing, or native count on IonQ, whose all-to-all connectivity needs no routing; $P(\mathrm{opt})$: probability that an accepted sample is optimal; DD: dynamical decoupling. \textsuperscript{a}Via Amazon Braket, no debiasing; its TVD is at the shot-noise level of its 61 accepted samples (mean $0.13$ for exact sampling).}
 \label{tab:eval_hardware}
 \footnotesize
 \setlength{\tabcolsep}{3pt}
@@ -23,8 +23,9 @@ Six UEs & 1868 & 0.036 (0.860) & 0.248 & 0.222 (0.423) \\
 $k=0$ & 8 & 0.107 (0.099) & 0.015 & 0.630 (0.632) \\
 $k=1$ & 767 & 0.050 (0.671) & 0.302 & 0.331 (0.632) \\
 \midrule
-\multicolumn{5}{@{}l}{IonQ Forte Enterprise, $k=1$} \\
-Demands $(1,2,1,2)$ & 196 & 0.099 (0.836) & 0.257 & 0.240 (0.444) \\
+\multicolumn{5}{@{}l}{IonQ, demands $(1,2,1,2)$} \\
+Forte-1, $k=0$\textsuperscript{a} & 4 & 0.122 (0.141) & 0.123 & 0.443 (0.444) \\
+Forte Enterprise, $k=1$ & 196 & 0.099 (0.836) & 0.257 & 0.240 (0.444) \\
 \bottomrule
 \end{tabular}
 \end{table}
