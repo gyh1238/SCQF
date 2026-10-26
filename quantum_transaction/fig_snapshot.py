@@ -7,7 +7,7 @@ Panels, each carrying one checkable claim rather than an illustration:
      marked, and every zone labelled with (UEs, state qubits, two-qubit gates)
      so the panel itself shows that the partitioner respected the budget;
 
- (b) per-zone accepted laws -- measured histogram against the exact
+ (b) per-zone accepted laws -- sampled histogram against the exact
      exp(lambda J_z) reference, plotted against utility rank so the panel
      stays readable at any zone size.  Ranks outside F_z carry exactly zero
      mass, which is strict feasibility made visible;
@@ -74,7 +74,8 @@ COL_RATIO = "#1f6fb4"
 GEO = True         # place the region on the campus rasters; see model_geo.py
 BASEMAP_DESAT = 0.0    # how far the campus is pulled toward its own luminance
 
-N_ZONE_PANELS = 4
+N_ZONE_PANELS = 2
+ZONE_PANELS = (13, 2)   # one-AP zone beside a three-AP one
 N_BND_PANELS = 2
 ABLATION_CACHE = "ablation_data.npz"
 ABLATION_G = (4, 5, 6, 7)
@@ -383,8 +384,11 @@ def panel_zone_law(ax, r, zcol, first):
         meas /= meas.sum()
 
     xs = np.arange(len(ref))
+    # the classical sampler of Sec. V-B drew these, so they are sampled, not
+    # measured; the TVD ties the panel to the number the text quotes
+    tv = 0.5 * float(np.abs(meas - ref).sum())
     ax.bar(xs, meas, width=0.9, color=_tint(zcol.get(zone.idx, "#888"), 0.85),
-           label="measured", zorder=2)
+           label=f"sampled, TVD {tv:.3f}", zorder=2)
     ax.step(np.concatenate([[-0.5], xs + 0.5]), np.concatenate([[ref[0]], ref]),
             where="pre", color="black", lw=1.0, label=r"$\propto e^{\lambda J_z}$",
             zorder=3)
@@ -454,7 +458,7 @@ def panel_boundary(ax, item, inst, reports, zcol, first):
     jv = np.array([joint[x, y] for x, y in combos])
     pv = np.array([prod[x, y] for x, y in combos])
 
-    # a combination absent from F_z is not rare, it is impossible: the two UEs
+    # a combination absent from F_z is not rare, it is infeasible: the two UEs
     # would break an owned RB or AP limit
     rows = rep["rows"]
     bad = np.array([not ((rows[:, ka] == x) & (rows[:, kb] == y)).any()
@@ -465,7 +469,7 @@ def panel_boundary(ax, item, inst, reports, zcol, first):
     jv, pv, bad = jv[order], pv[order], bad[order]
 
     ax.bar(xs - 0.19, jv, width=0.36, color=_tint(zcol.get(zone.idx, "#888"), 0.95),
-           label="joint report")
+           label="joint samples")
     ax.bar(xs[~bad] + 0.19, pv[~bad], width=0.36, facecolor="none",
            edgecolor="#333333", hatch="////", lw=0.7, label="product of marginals")
     ax.bar(xs[bad] + 0.19, pv[bad], width=0.36, facecolor="none",
@@ -476,7 +480,7 @@ def panel_boundary(ax, item, inst, reports, zcol, first):
     for i in np.where(bad)[0]:
         # one short word: two lines were wide enough to reach the neighbouring
         # bar once the composite narrows these panels
-        ax.annotate("impossible", (i + 0.19, pv[i]), textcoords="offset points",
+        ax.annotate("infeasible", (i + 0.19, pv[i]), textcoords="offset points",
                     xytext=(0, 4), ha="center", va="bottom", fontsize=FS_LEGEND,
                     color="#c1440e")
 
@@ -532,7 +536,9 @@ def panel_ablation(ax, data, first=False):
     above the diagonal are instances where keeping the joint list helped.
     """
     lo_v, hi_v = data[:, 0], data[:, 1]
-    lo = min(data.min(), 96.0) - 0.4
+    # extra room below: the summary sits in the lower-right corner, and one
+    # instance falls in that corner when the axis starts just under the data
+    lo = min(data.min(), 96.0) - 1.2
     hi = max(data.max(), 100.0) + 0.4
 
     ax.plot([lo, hi], [lo, hi], "-", color="#999999", lw=1.0, zorder=1)
@@ -543,7 +549,6 @@ def panel_ablation(ax, data, first=False):
 
     won = int((hi_v > lo_v).sum())
     gap = float((hi_v - lo_v).mean())
-    # every point sits above the line, so the corner below it stays free
     ax.text(0.96, 0.05, f"+{gap:.1f} pp on average\n{won} of {len(data)} above",
             transform=ax.transAxes, ha="right", va="bottom",
             fontsize=FS_LEGEND + 0.6, color=COL_RATIO, linespacing=1.35)
@@ -551,8 +556,8 @@ def panel_ablation(ax, data, first=False):
     ax.set_xlim(lo, hi)
     ax.set_ylim(lo, hi)
     ax.set_title("cost of dropping the joint list", fontsize=FS_TITLE)
-    ax.set_xlabel("one-pass marginals  [%]", fontsize=FS_LABEL)
-    ax.set_ylabel("re-conditioned joint list  [%]", fontsize=FS_LABEL)
+    ax.set_xlabel("one-pass [%]", fontsize=FS_LABEL)
+    ax.set_ylabel("re-conditioned [%]", fontsize=FS_LABEL)
     ax.grid(alpha=0.3, lw=0.5)
     ax.tick_params(labelsize=FS_TICK)
 
@@ -566,9 +571,9 @@ def panel_order(ax, res):
     """
     conf = [t["conf"] for t in res["trace"]]
     ax.plot(np.arange(1, len(conf) + 1), conf, ".", ms=4, color="#1f6fb4")
-    ax.set_ylim(0.4, 1.02)
+    ax.set_ylim(-0.02, 1.02)
     ax.set_xlabel("boundary UE, in decimation order", fontsize=FS_LABEL)
-    ax.set_ylabel(r"confidence $\max_v b_i(v)$", fontsize=FS_LABEL)
+    ax.set_ylabel(r"confidence $\gamma_i$", fontsize=FS_LABEL)
     n_exc = res["exceptions"]
     # The re-sample count moves off the title and into the panel.  This is the
     # narrowest column in the composite and the panel letter now sits in front
@@ -597,15 +602,22 @@ def main():
     zcol = {z: cmap(i % 20) for i, z in
             enumerate(sorted(r["zone"].idx for r in active))}
 
-    fig = plt.figure(figsize=(13.6, 6.4))
-    gs = fig.add_gridspec(2, 5, width_ratios=[1.95, 1, 1, 1, 1],
+    # (a) takes both rows at full height; the right block is 2 x 3, with the
+    # two zone laws and the decimation order above the three (c) panels.
+    # Four zone laws all said the same thing, and the space they took is what
+    # the map needed to be legible.
+    fig = plt.figure(figsize=(13.6, 6.9))
+    gs = fig.add_gridspec(2, 4, width_ratios=[2.15, 1, 1, 1],
                           height_ratios=[1, 1])
 
     ax_map = fig.add_subplot(gs[:, 0])
     panel_map(ax_map, inst, part, active, zcol)
     _tag(ax_map, "a")
 
-    zone_panels = pick_zone_panels(active, N_ZONE_PANELS)
+    by_idx = {r["zone"].idx: r for r in active}
+    zone_panels = ([by_idx[z] for z in ZONE_PANELS]
+                   if all(z in by_idx for z in ZONE_PANELS)
+                   else pick_zone_panels(active, N_ZONE_PANELS))
     for j, r in enumerate(zone_panels):
         ax = fig.add_subplot(gs[0, 1 + j])
         panel_zone_law(ax, r, zcol, j == 0)
@@ -623,7 +635,7 @@ def main():
     ax = fig.add_subplot(gs[1, 1 + N_BND_PANELS])
     panel_ablation(ax, abl)
     _tag(ax, f"c{N_BND_PANELS + 1}")
-    ax = fig.add_subplot(gs[1, 4])
+    ax = fig.add_subplot(gs[0, 1 + N_ZONE_PANELS])
     panel_order(ax, res)
     _tag(ax, "d")
 
@@ -631,7 +643,7 @@ def main():
     # document that places the figure, and the numbers behind this instance
     # are printed to stdout and recorded in fig/README.md.
     fig.subplots_adjust(left=0.028, right=0.988, top=0.945, bottom=0.075,
-                        wspace=0.34, hspace=0.42)
+                        wspace=0.30, hspace=0.42)
     os.makedirs("fig", exist_ok=True)
     _save(fig, "fig/fig_snapshot", formats=("pdf", "png"), dpi=200)
     plt.close(fig)

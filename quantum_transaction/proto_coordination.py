@@ -40,6 +40,18 @@ def _marginal(codes, w, k, n_val, alpha=0.5):
     return (c + alpha) / (c.sum() + alpha * n_val)
 
 
+def _confidence(b):
+    """Normalized-entropy confidence gamma_i of Eq. (app-confidence).
+
+    0 for a uniform consensus, 1 for a certain one.  A UE with a single
+    candidate has nothing left to decide and is taken as certain.
+    """
+    if len(b) < 2:
+        return 1.0
+    p = b[b > 0]
+    return 1.0 + float((p * np.log(p)).sum()) / np.log(len(b))
+
+
 def _ess(w):
     """Effective sample size of a weighted list: (sum w)^2 / sum w^2."""
     if len(w) == 0:
@@ -247,7 +259,7 @@ def _run_once(inst, part, beta, ubar, k_accept, k_min, shot_budget, rng,
                         continue
                     b *= _marginal(ck, wk, k, n_val)
                 b = b / b.sum()
-                conf = float(b.max())
+                conf = _confidence(b)
                 if conf > best_conf:
                     best_i, best_conf, best_b = i, conf, b
             seq.append(best_i)

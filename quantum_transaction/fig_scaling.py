@@ -126,6 +126,16 @@ def _ylabel(ax, concept, metric):
     ax.set_ylabel(f"{concept}\n{metric}", fontsize=9.5, linespacing=1.6)
 
 
+def _letter(ax, letter):
+    """Panel letter in the top-left corner, so the text can cite (a)-(c).
+
+    Each legend is moved right of it rather than the letter going outside the
+    axes, where the two-line y labels already take the margin.
+    """
+    ax.text(0.012, 0.975, f"({letter})", transform=ax.transAxes, ha="left",
+            va="top", fontsize=10, fontweight="bold", zorder=10)
+
+
 def panel_cost(ax, x, z2q, z2lo, z2hi, c2q, standalone=False):
     """(a) two-qubit gates of one oracle pass: centralized against per zone."""
     ax.set_yscale("log")
@@ -147,7 +157,8 @@ def panel_cost(ax, x, z2q, z2lo, z2hi, c2q, standalone=False):
                 fontsize=7.5, color=COL["zone"])
     _ylabel(ax, "circuit complexity", "two-qubit gates, one oracle pass")
     ax.set_ylim(min(z2q) / 3, max(c2q) * 6)
-    ax.legend(loc="upper left", fontsize=8, framealpha=0.95)
+    ax.legend(loc="upper left", bbox_to_anchor=(0.06, 1.0), fontsize=8,
+              framealpha=0.95)
     ax.grid(alpha=0.25, which="both", lw=0.5)
     if standalone:
         ax.set_xlabel("zones after partitioning", fontsize=10)
@@ -166,9 +177,10 @@ def panel_comm(ax, x, tot_kb, per_kb, standalone=False):
     ax.annotate(f"×{per_kb[-1]/per_kb[0]:.2f}", (x[-1], per_kb[-1]),
                 textcoords="offset points", xytext=(-6, -13), ha="right",
                 fontsize=7.5, color=COL["zone"])
-    _ylabel(ax, "communication volume", "classical report [kB]")
+    _ylabel(ax, "communication volume", "coordination traffic [kB]")
     ax.set_ylim(min(per_kb) / 3, max(tot_kb) * 6)
-    ax.legend(loc="upper left", fontsize=8, framealpha=0.95)
+    ax.legend(loc="upper left", bbox_to_anchor=(0.06, 1.0), fontsize=8,
+              framealpha=0.95)
     ax.grid(alpha=0.25, which="both", lw=0.5)
     if standalone:
         ax.set_xlabel("zones after partitioning", fontsize=10)
@@ -182,10 +194,13 @@ def panel_quality(ax, x, ratio, rlo, rhi, n_ues, standalone=False):
             label="distributed utility / centralized strict optimum")
     ax.text(x[-1], 99.75, "100 % = centralized optimum", ha="right",
             va="top", fontsize=7, color="#777777")
-    ax.set_ylim(90, 100.4)
-    ax.set_yticks([90, 92, 94, 96, 98, 100])
+    # every instance lies above 96.7 %, so 90-95 was empty axis; the headroom
+    # above 100 keeps the panel letter off the reference line
+    ax.set_ylim(95, 100.8)
+    ax.set_yticks([95, 96, 97, 98, 99, 100])
     _ylabel(ax, "solution accuracy", "utility vs. centralized optimum [%]")
-    ax.legend(loc="lower left", fontsize=8, framealpha=0.95)
+    ax.legend(loc="lower left", bbox_to_anchor=(0.06, 0.0), fontsize=8,
+              framealpha=0.95)
     ax.grid(alpha=0.25, lw=0.5)
     ax.set_xticks(x)
     ax.set_xticklabels([f"{xi:.0f}\n{nu:.0f}" for xi, nu in zip(x, n_ues)],
@@ -235,6 +250,8 @@ def plot(arr, skipped):
     panel_cost(ax_c, x, z2q, z2lo, z2hi, c2q)
     panel_comm(ax_m, x, tot_kb, per_kb)
     panel_quality(ax_q, x, ratio, rlo, rhi, n_ues)
+    for ax, letter in ((ax_c, "a"), (ax_m, "b"), (ax_q, "c")):
+        _letter(ax, letter)
 
     # No title and no caption block: both belong to the document that places
     # the figure, and the numbers are printed to stdout and kept in
@@ -263,6 +280,7 @@ def plot(arr, skipped):
     for stem, draw in specs:
         f, a = plt.subplots(figsize=(5.4, 3.4))
         draw(a)
+        _letter(a, stem.split("_")[1])   # the letter the file is named for
         f.tight_layout()
         _save(f, f"{PANEL_DIR}/{stem}", dpi=200)
         plt.close(f)

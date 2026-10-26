@@ -200,7 +200,7 @@ def draw(output_dir: Path) -> tuple[Path, Path]:
         color=colors["Proposed, enhanced"],
         linewidth=2.5,
         linestyle=(0, (7, 3)),
-        label=r"Proposed enhanced ($b_m=3$, $s=4$)",
+        label=r"Proposed enhanced ($Q^{\mathrm{cnt}}=3$, $R_{\mathrm{cnt}}=4$)",
         zorder=4,
     )
     ax.plot(
@@ -226,18 +226,6 @@ def draw(output_dir: Path) -> tuple[Path, Path]:
         linewidth=2.9,
         label=r"Classical: $0.400N_z^3$ ns",
         zorder=2,
-    )
-
-    enhanced_cross = crossovers["Proposed, enhanced"]
-    favorable = n_values >= enhanced_cross
-    ax.fill_between(
-        n_values[favorable],
-        proposed_enhanced[favorable],
-        classical[favorable],
-        color=colors["Proposed, enhanced"],
-        alpha=0.065,
-        linewidth=0,
-        zorder=0,
     )
 
     for name, crossing in crossovers.items():
@@ -285,7 +273,6 @@ def draw(output_dir: Path) -> tuple[Path, Path]:
         ),
     )
 
-    ax.set_title("Zone-local classical–quantum crossover")
     ax.set_xlabel(r"Zone size $N_z$ (UEs)")
     ax.set_ylabel("Modeled logical latency (s)")
 
