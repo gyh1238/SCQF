@@ -280,7 +280,8 @@ def plot(arr, skipped):
     fig.subplots_adjust(left=0.205, right=0.975, top=0.99, bottom=0.115,
                         hspace=0.12)
     os.makedirs("fig", exist_ok=True)
-    _save(fig, "fig/fig_scaling", formats=("pdf", "png"), dpi=400)
+    _save(fig, "fig/fig_scaling", formats=("pdf", "png"), dpi=400,
+          bbox_inches="tight", pad_inches=0.02)      # no empty margin
     plt.close(fig)
     print("wrote fig/fig_scaling.pdf and .png")
 

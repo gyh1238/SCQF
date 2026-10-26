@@ -751,7 +751,8 @@ def main():
     # document that places the figure, and the numbers behind this instance
     # are printed to stdout and recorded in fig/README.md.
     os.makedirs("fig", exist_ok=True)
-    _save(fig, "fig/fig_snapshot", formats=("pdf", "png"), dpi=400)
+    _save(fig, "fig/fig_snapshot", formats=("pdf", "png"), dpi=400,
+          bbox_inches="tight", pad_inches=0.02)      # no empty margin
     plt.close(fig)
     print("wrote fig/fig_snapshot.pdf and .png")
 
