@@ -258,8 +258,9 @@ def draw(output_dir: Path) -> tuple[Path, Path]:
 
     png_path = output_dir / "qtg_assignment_runtime_comparison.png"
     pdf_path = output_dir / "qtg_assignment_runtime_comparison.pdf"
-    fig.savefig(png_path, dpi=400, bbox_inches="tight", facecolor="white")
-    fig.savefig(pdf_path, bbox_inches="tight", facecolor="white")
+    # transparent like the other figures, so all of them sit on the page alike
+    fig.savefig(png_path, dpi=400, bbox_inches="tight", transparent=True)
+    fig.savefig(pdf_path, bbox_inches="tight", transparent=True)
     plt.close(fig)
 
     for name, crossing in crossovers.items():
