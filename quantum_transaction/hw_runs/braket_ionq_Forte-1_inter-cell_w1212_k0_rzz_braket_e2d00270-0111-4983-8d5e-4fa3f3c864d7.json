@@ -1,0 +1,37 @@
+{
+ "case": "inter-cell, 4 UE x 2 AP, demands (1, 2, 1, 2), cap 4",
+ "case_key": "inter-cell_w1212_k0_rzz_braket",
+ "demands": [
+  1,
+  2,
+  1,
+  2
+ ],
+ "cap": 4,
+ "k": 0,
+ "shots": 500,
+ "backend": "braket_ionq_Forte-1",
+ "simulator": false,
+ "job_id": "e2d00270-0111-4983-8d5e-4fa3f3c864d7",
+ "task_arn": "arn:aws:braket:us-east-1:383111754443:quantum-task/e2d00270-0111-4983-8d5e-4fa3f3c864d7",
+ "submitted_utc": "2026-10-26T07:33:15.670000+00:00",
+ "logical_qubits": 16,
+ "two_qubit": 4,
+ "depth": 5,
+ "basis": "rzz",
+ "optimization_level": 3,
+ "error_mitigation": null,
+ "measure_map": [
+  0,
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7
+ ],
+ "lam": 0.1976284584980237,
+ "n_feasible": 10,
+ "price_usd": 40.3
+}

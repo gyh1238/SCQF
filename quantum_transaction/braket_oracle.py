@@ -147,7 +147,8 @@ def main():
             case=name,
             case_key=f"{case_key(name, a.k, demands)}_{a.basis}_braket",
             demands=demands, cap=a.cap, k=a.k, shots=a.shots,
-            backend=f"braket:ionq/{a.device}", simulator=False,
+            # the backend names the record file, so no ':' or '/' in it
+            backend=f"braket_ionq_{a.device}", simulator=False,
             job_id=tid, task_arn=task.id,
             submitted_utc=datetime.now(timezone.utc).isoformat(),
             logical_qubits=qc.num_qubits, two_qubit=n2q(tqc),
