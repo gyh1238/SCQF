@@ -201,6 +201,84 @@ def _tag(ax, letter):
     ax.title.set_text(f"({letter}) {ax.title.get_text()}")
 
 
+def _place_zone_labels(ax, inst, part, active, lo, hi, bset):
+    """Zone labels placed where they cover the fewest APs.
+
+    A label used to sit just above its APs' centroid, and on the campus that
+    point is often another zone's AP, so the box hid the very square it was
+    naming.  Each label now tries a ring of positions around its own APs and
+    takes the one that overlaps least with every AP square, then with labels
+    already placed and boundary UEs, then with the frame, breaking ties by
+    distance to its own zone.  Sizes are measured in the rendered axes, so
+    the boxes are the ones that print.
+    """
+    span = float(hi[0] - lo[0])
+    ax.apply_aspect()
+    fig = ax.figure
+    renderer = fig.canvas.get_renderer()
+    dpp = span / ax.get_window_extent(renderer).width       # data per pixel
+    pt = fig.dpi / 72.0 * dpp                                # data per point
+
+    def rect(cx, cy, w, h):
+        return (cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2)
+
+    def overlap(r1, r2):
+        dx = min(r1[2], r2[2]) - max(r1[0], r2[0])
+        dy = min(r1[3], r2[3]) - max(r1[1], r2[1])
+        return dx * dy if dx > 0 and dy > 0 else 0.0
+
+    ap_half = (np.sqrt(62) / 2 + 1.2) * pt                   # marker + halo
+    ue_half = (np.sqrt(18) / 2 + 0.9) * pt
+    aps = [rect(x, y, 2 * ap_half, 2 * ap_half) for x, y in inst.ap_xy]
+    ues = [rect(*inst.ue_xy[i], 2 * ue_half, 2 * ue_half) for i in bset]
+
+    items = []
+    for r in active:
+        zone = r["zone"]
+        st = part.stats[zone.idx]
+        text = f"Z{zone.idx}\n{st['n_ue']}u {st['q_state']}q\n{st['n2q']}"
+        t = ax.text(0, 0, text, fontsize=FS_MAP_ZONE, linespacing=0.9)
+        ext = t.get_window_extent(renderer)
+        t.remove()
+        pad = 2 * 0.1 * FS_MAP_ZONE * pt
+        items.append((text, inst.ap_xy[zone.aps], ext.width * dpp + pad,
+                      ext.height * dpp + pad))
+
+    angles = np.deg2rad(np.arange(0, 360, 22.5))
+    placed = [None] * len(items)
+    for _ in range(3):                    # greedy, then two passes of re-placing
+        for k, (text, own, w, h) in enumerate(items):
+            c = own.mean(axis=0)
+            cands = [c]
+            for rad in (0.5, 0.75, 1.0, 1.3, 1.7):
+                d = rad * max(w, h)
+                for base in [c] + list(own):
+                    cands += [base + d * np.array([np.cos(t), np.sin(t)])
+                              for t in angles]
+            best = None
+            for cx, cy in cands:
+                cx = float(np.clip(cx, lo[0] + w / 2, hi[0] - w / 2))
+                cy = float(np.clip(cy, lo[1] + h / 2, hi[1] - h / 2))
+                box = rect(cx, cy, w, h)
+                cost = 50 * sum(overlap(box, q) for q in aps)
+                cost += 20 * sum(overlap(box, placed[j]) for j in range(len(items))
+                                 if j != k and placed[j] is not None)
+                cost += 5 * sum(overlap(box, q) for q in ues)
+                cost /= w * h
+                dist = np.min(np.hypot(own[:, 0] - cx, own[:, 1] - cy))
+                cost += 0.15 * dist / span * 10
+                if best is None or cost < best[0]:
+                    best = (cost, box)
+            placed[k] = best[1]
+
+    for (text, *_), box in zip(items, placed):
+        ax.annotate(text, ((box[0] + box[2]) / 2, (box[1] + box[3]) / 2),
+                    fontsize=FS_MAP_ZONE, ha="center", va="center", zorder=6,
+                    linespacing=0.9,
+                    bbox=dict(boxstyle="round,pad=0.1", fc="white", ec="none",
+                              alpha=0.85))
+
+
 def panel_map(ax, inst, part, active, zcol, desat=None):
     """(a) the partition, annotated with the resources it produced.
 
@@ -314,37 +392,6 @@ def panel_map(ax, inst, part, active, zcol, desat=None):
                        edgecolor="white" if on_map else "none",
                        linewidth=0.5, zorder=3)
 
-    # Zone labels sit just above their APs' centroid.  At print size two
-    # neighbouring zones' labels can land on each other, so overlapping labels
-    # are pushed apart vertically, a few passes, keeping each near its zone.
-    box_w, box_h = 0.13 * span, 0.10 * span          # one label, data units
-    labels = []
-    for r in active:
-        zone = r["zone"]
-        st = part.stats[zone.idx]
-        c = inst.ap_xy[zone.aps].mean(axis=0)
-        labels.append([c[0], c[1] + 0.34,
-                       f"Z{zone.idx}\n{st['n_ue']}u {st['q_state']}q\n{st['n2q']}"])
-    for _ in range(20):
-        moved = False
-        for i in range(len(labels)):
-            for j in range(i + 1, len(labels)):
-                a, b = labels[i], labels[j]
-                dy = b[1] - a[1]
-                if abs(b[0] - a[0]) < box_w and abs(dy) < box_h:
-                    push = (box_h - abs(dy)) / 2 + 1e-3
-                    sgn = 1.0 if dy >= 0 else -1.0
-                    a[1] -= sgn * push
-                    b[1] += sgn * push
-                    moved = True
-        if not moved:
-            break
-    for x_l, y_l, text in labels:
-        ax.annotate(text, (x_l, y_l), fontsize=FS_MAP_ZONE, ha="center",
-                    va="center", zorder=6, linespacing=0.9,
-                    bbox=dict(boxstyle="round,pad=0.1", fc="white", ec="none",
-                              alpha=0.85))
-
     ax.set_title(f"{BUDGET_DEFAULT} two-qubit budget: "
                  f"{inst.n_ap} APs, {inst.n_ue} UEs\n"
                  f"$\\rightarrow$ {len(active)} zones, "
@@ -354,6 +401,7 @@ def panel_map(ax, inst, part, active, zcol, desat=None):
     ax.set_aspect("equal")
     ax.set_xlim(lo[0], hi[0])
     ax.set_ylim(lo[1], hi[1])
+    _place_zone_labels(ax, inst, part, active, lo, hi, bset)
     ax.legend(handles=[
         Patch(facecolor="#bbbbbb", edgecolor="black", label="AP (colour = zone)"),
         plt.Line2D([], [], color=_tint("#c1440e", 0.55), lw=0.9,
