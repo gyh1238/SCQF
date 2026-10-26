@@ -345,8 +345,8 @@ def panel_map(ax, inst, part, active, zcol, desat=None):
                     bbox=dict(boxstyle="round,pad=0.1", fc="white", ec="none",
                               alpha=0.85))
 
-    ax.set_title(f"partition under a {BUDGET_DEFAULT} two-qubit budget\n"
-                 f"{inst.n_ap} APs, {inst.n_ue} UEs "
+    ax.set_title(f"{BUDGET_DEFAULT} two-qubit budget: "
+                 f"{inst.n_ap} APs, {inst.n_ue} UEs\n"
                  f"$\\rightarrow$ {len(active)} zones, "
                  f"$|\\mathcal{{B}}|$={len(part.boundary)} boundary UEs "
                  f"({100*part.boundary_density:.0f}%)", fontsize=FS_TITLE, pad=4)
@@ -356,19 +356,19 @@ def panel_map(ax, inst, part, active, zcol, desat=None):
     ax.set_ylim(lo[1], hi[1])
     ax.legend(handles=[
         Patch(facecolor="#bbbbbb", edgecolor="black", label="AP (colour = zone)"),
+        plt.Line2D([], [], color=_tint("#c1440e", 0.55), lw=0.9,
+                   label="UE-to-candidate-AP link"),
         plt.Line2D([], [], marker="o", ls="", mfc="white", mec="#c1440e",
                    mew=1.1, ms=5, label="boundary UE"),
         plt.Line2D([], [], marker="o", ls="", color="#999999", ms=3.5,
-                   label="interior UE"),
-        plt.Line2D([], [], color=_tint("#c1440e", 0.55), lw=0.9,
-                   label="UE-to-candidate-AP link")],
+                   label="interior UE")],
         loc="upper left", bbox_to_anchor=(-0.01, -0.005), fontsize=FS_MAP_KEY,
-        ncol=2, frameon=False, handletextpad=0.4, columnspacing=1.0,
+        ncol=2, frameon=False, handletextpad=0.4, columnspacing=0.8,
         borderpad=0.2, labelspacing=0.25, handlelength=1.6,
         # two lines, not one: in the composite this panel is narrower than the
         # standalone, and a single line of this ran into the neighbouring axes
         title=("outline: zone territory (nearest AP)\n"
-               "basemap: campus; APs on registered masts,\n"
+               "basemap: campus; APs on masts,\n"
                "UEs on open ground"
                if on_map else "shading: zone territory (nearest AP)"),
         title_fontsize=FS_MAP_KEY, alignment="left")
@@ -418,27 +418,28 @@ def panel_zone_law(ax, r, zcol, first):
     # measured; the TVD ties the panel to the number the text quotes
     tv = 0.5 * float(np.abs(meas - ref).sum())
     ax.bar(xs, meas, width=0.9, color=_tint(zcol.get(zone.idx, "#888"), 0.85),
-           label=f"sampled, TVD {tv:.3f}", zorder=2)
+           label=f"sampled,\nTVD {tv:.3f}", zorder=2)
     ax.step(np.concatenate([[-0.5], xs + 0.5]), np.concatenate([[ref[0]], ref]),
             where="pre", color="black", lw=1.0, label=r"$\propto e^{\lambda J_z}$",
             zorder=3)
     # the note runs up the band rather than across it, so the band can stay
     # narrow at print size without the text running off the axes
-    pad = max(3, len(ref) * 0.10)
+    pad = max(3, len(ref) * 0.16)
     ax.axvspan(len(ref) - 0.5, len(ref) + pad, color=_tint("#c1440e", 0.09), lw=0)
     ax.text(len(ref) + pad * 0.45, ax.get_ylim()[1] * 0.5,
-            "infeasible:\nzero mass", rotation=90, linespacing=1.0,
+            "infeasible", rotation=90,
             fontsize=FS_LEGEND, color="#c1440e", ha="center", va="center")
     ax.set_xlim(-0.8, len(ref) + pad)
     n_ap = len(zone.aps)
-    ax.set_title(f"zone Z{zone.idx}: {n_ap} AP{'' if n_ap == 1 else 's'}, "
+    ax.set_title(f"zone Z{zone.idx}: {n_ap} AP{'' if n_ap == 1 else 's'},\n"
                  f"$N_z$={zone.n_ue}, $|\mathcal{{F}}_z|$={len(ref)}",
                  fontsize=FS_TITLE)
-    ax.set_xlabel("assignment, ranked by $J_z$", fontsize=FS_LABEL)
+    ax.set_xlabel("rank by $J_z$", fontsize=FS_LABEL)
     if first:
         ax.set_ylabel("accepted probability", fontsize=FS_LABEL)
     ax.legend(fontsize=FS_LEGEND, framealpha=0.9, loc="upper right",
-              bbox_to_anchor=(0.86, 1.0), borderpad=0.3, labelspacing=0.25)
+              bbox_to_anchor=(0.86, 1.0), borderpad=0.25, labelspacing=0.25,
+              handlelength=1.1, handletextpad=0.4, borderaxespad=0.2)
     ax.tick_params(labelsize=FS_TICK)
 
 
@@ -525,14 +526,14 @@ def panel_boundary(ax, item, inst, reports, zcol, first):
     ax.set_title(f"zone Z{zone.idx},\nboundary UEs {ua} & {ub}",
                  fontsize=FS_TITLE)
     ax.set_xticks(xs)
-    ax.set_xticklabels([f"RB{int(zone.cand[ka][x])}\nRB{int(zone.cand[kb][y])}"
-                        for x, y in combos], fontsize=FS_TICK - 0.6)
-    ax.set_xlabel("joint choice", fontsize=FS_LABEL)
+    ax.set_xticklabels([f"{int(zone.cand[ka][x])}\n{int(zone.cand[kb][y])}"
+                        for x, y in combos], fontsize=FS_TICK)
+    ax.set_xlabel("joint RB choice", fontsize=FS_LABEL)
     if first:
         ax.set_ylabel("probability", fontsize=FS_LABEL)
     ax.legend(fontsize=FS_LEGEND, framealpha=0.9, loc="upper right",
-              borderpad=0.25, labelspacing=0.2, handlelength=1.2,
-              handletextpad=0.4, borderaxespad=0.25)
+              borderpad=0.2, labelspacing=0.2, handlelength=1.0,
+              handletextpad=0.3, borderaxespad=0.2)
     ax.tick_params(labelsize=FS_TICK)
 
 
@@ -592,12 +593,15 @@ def panel_ablation(ax, data, first=False):
 
     won = int((hi_v > lo_v).sum())
     gap = float((hi_v - lo_v).mean())
-    ax.text(0.96, 0.05, f"+{gap:.1f} pp on average\n{won} of {len(data)} above",
+    ax.text(0.96, 0.03, f"+{gap:.1f} pp avg,\n{won}/{len(data)} above",
             transform=ax.transAxes, ha="right", va="bottom",
             fontsize=FS_LEGEND, color=COL_RATIO, linespacing=1.25)
 
     ax.set_xlim(lo, hi)
     ax.set_ylim(lo, hi)
+    ticks = [t for t in range(90, 101, 2) if lo <= t <= hi]
+    ax.set_xticks(ticks)
+    ax.set_yticks(ticks)
     ax.set_title("cost of dropping\nthe joint list", fontsize=FS_TITLE)
     ax.set_xlabel("one-pass [%]", fontsize=FS_LABEL)
     ax.set_ylabel("re-conditioned [%]", fontsize=FS_LABEL)
@@ -615,7 +619,7 @@ def panel_order(ax, res):
     conf = [t["conf"] for t in res["trace"]]
     ax.plot(np.arange(1, len(conf) + 1), conf, "o", ms=2.6, color="#1f6fb4")
     ax.set_ylim(-0.02, 1.02)
-    ax.set_xlabel("decimation order", fontsize=FS_LABEL)
+    ax.set_xlabel("boundary UE", fontsize=FS_LABEL)
     ax.set_ylabel(r"confidence $\gamma_i$", fontsize=FS_LABEL)
     n_exc = res["exceptions"]
     # The re-sample count moves off the title and into the panel.  This is the
@@ -623,10 +627,10 @@ def panel_order(ax, res):
     # of the title, which left the count fitting at one digit and overflowing
     # at two -- a caption that breaks on the value it reports.  Inside the
     # axes it has room at any count, in a corner the curve does not reach.
-    ax.set_title("boundary UEs fixed,\nleast ambiguous first",
+    ax.set_title("fixing order,\nleast ambiguous first",
                  fontsize=FS_TITLE)
     ax.annotate(f"{n_exc} exception\nre-sample{'' if n_exc == 1 else 's'}",
-                (0.97, 0.47), xycoords="axes fraction", ha="right", va="top",
+                (0.97, 0.95), xycoords="axes fraction", ha="right", va="top",
                 fontsize=FS_LEGEND, color="#555555")
     ax.grid(alpha=0.3, lw=0.5)
     ax.tick_params(labelsize=FS_TICK)
@@ -645,39 +649,36 @@ def main():
     zcol = {z: cmap(i % 20) for i, z in
             enumerate(sorted(r["zone"].idx for r in active))}
 
-    # Two-column layout at print size, kept short so it does not take most of
-    # a page.  Heights are laid out in inches: the map (a) is a square with
-    # its key under it, the two zone laws (b) stand beside it and end level
-    # with the key, and the (c)/(d) row runs underneath.
-    H = 5.9
-    t_top, map_h, key_h, gap, row_h = 0.33, 2.85, 0.66, 0.44, 1.12
-    map_top = 1 - t_top / H
-    map_bot = map_top - map_h / H
-    key_bot = map_bot - key_h / H
+    # Two-column layout at print size, with the map (a) on the left at full
+    # height and a 2 x 3 block beside it: the zone laws and the decimation
+    # order above, the three (c) panels below.  Stacking the panels instead
+    # made the figure a page tall.  Positions are in inches; the block's
+    # columns are separated by spacer columns sized to what sits in the gap
+    # (tick labels only in the middle, a y-label before the third column).
+    H = 3.95
+    t_top, map_w, b_bot, row_gap = 0.36, 2.6, 0.52, 0.72
+    top_f = 1 - t_top / H
     fig = plt.figure(figsize=(FIG_W, H))
-    left = fig.add_gridspec(1, 1, left=0.012, right=0.012 + map_h / FIG_W,
-                            top=map_top, bottom=map_bot)
-    right = fig.add_gridspec(2, 1, hspace=0.62, left=0.5, right=0.99,
-                             top=map_top, bottom=key_bot + 0.40 / H)
-    row_top = key_bot - gap / H
-    bottom = fig.add_gridspec(1, 4, wspace=0.62, left=0.065, right=0.985,
-                              top=row_top, bottom=row_top - row_h / H)
+    left = fig.add_gridspec(1, 1, left=0.03 / FIG_W, right=(0.03 + map_w) / FIG_W,
+                            top=top_f, bottom=top_f - map_w / H)
+    x0, x1 = (0.03 + map_w + 0.47) / FIG_W, 0.975
+    h_ax = (H - t_top - b_bot - row_gap) / 2
+    blk = fig.add_gridspec(2, 5, width_ratios=[1, 0.44, 1, 0.48, 1],
+                           left=x0, right=x1, top=top_f, bottom=b_bot / H,
+                           wspace=0, hspace=row_gap / h_ax)
+    cell = {(r, c): blk[r, 2 * c] for r in range(2) for c in range(3)}
 
     ax_map = fig.add_subplot(left[0])
     panel_map(ax_map, inst, part, active, zcol)
     _tag(ax_map, "a")
-    # the title is wider than the map; run it from the map's left edge into
-    # the gap before (b) instead of past the figure's left edge
-    ax_map.title.set_ha("left")
-    ax_map.title.set_x(0.0)
 
     by_idx = {r["zone"].idx: r for r in active}
     zone_panels = ([by_idx[z] for z in ZONE_PANELS]
                    if all(z in by_idx for z in ZONE_PANELS)
                    else pick_zone_panels(active, N_ZONE_PANELS))
     for j, r in enumerate(zone_panels):
-        ax = fig.add_subplot(right[j])
-        panel_zone_law(ax, r, zcol, True)
+        ax = fig.add_subplot(cell[0, j])
+        panel_zone_law(ax, r, zcol, j == 0)
         _tag(ax, f"b{j + 1}")
 
     pairs = [(ri, best) for ri, rep in enumerate(reports)
@@ -685,14 +686,14 @@ def main():
     pairs.sort(key=lambda it: -it[1][0])
     pairs = pairs[:N_BND_PANELS]
     for j, item in enumerate(pairs):
-        ax = fig.add_subplot(bottom[j])
+        ax = fig.add_subplot(cell[1, j])
         panel_boundary(ax, item, inst, reports, zcol, j == 0)
         _tag(ax, f"c{j + 1}")
     abl = ablation_data()
-    ax = fig.add_subplot(bottom[N_BND_PANELS])
+    ax = fig.add_subplot(cell[1, N_BND_PANELS])
     panel_ablation(ax, abl)
     _tag(ax, f"c{N_BND_PANELS + 1}")
-    ax = fig.add_subplot(bottom[N_BND_PANELS + 1])
+    ax = fig.add_subplot(cell[0, N_ZONE_PANELS])
     panel_order(ax, res)
     _tag(ax, "d")
 

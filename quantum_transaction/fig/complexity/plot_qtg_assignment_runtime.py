@@ -201,9 +201,16 @@ def draw(output_dir: Path) -> tuple[Path, Path]:
     ax.plot(n_values, classical, color=colors["Classical"], linewidth=1.8,
             label=r"Classical: $0.400N_z^3$ ns", zorder=2)
 
-    # Each crossover is marked on its curve and its N_z written along its
-    # dashed line, at the bottom of the axes where no curve runs, so the value
-    # sits next to the point it belongs to instead of in a separate box.
+    # Each crossover is marked on its curve and its N_z written upright on its
+    # dashed line, in the empty lower part of the axes.  The three right-hand
+    # lines are closer together than a label is wide, so their labels step up
+    # one above the other instead of sitting side by side.
+    label_y = {
+        "Proposed, enhanced": 3.6e-7,
+        "Proposed, serial": 3.6e-7,
+        "GAS": 7.5e-7,
+        "QTG": 1.55e-6,
+    }
     for name, crossing in crossovers.items():
         color = colors[name]
         y_cross = float(classical_seconds(np.array([crossing]))[0])
@@ -211,10 +218,10 @@ def draw(output_dir: Path) -> tuple[Path, Path]:
                    linestyle=(0, (3, 3)), alpha=0.8, zorder=1)
         ax.scatter([crossing], [y_cross], s=22, facecolor="white",
                    edgecolor=color, linewidth=1.2, zorder=7)
-        ax.annotate(f"{crossing:.1f}", (crossing, 2.6e-7),
-                    xytext=(-2, 0), textcoords="offset points", rotation=90,
-                    ha="right", va="bottom", fontsize=7, color=color,
-                    fontweight="bold")
+        ax.text(crossing, label_y[name], f"{crossing:.1f}", ha="center",
+                va="center", fontsize=8, color=color, fontweight="bold",
+                zorder=8, bbox=dict(boxstyle="round,pad=0.15", fc="white",
+                                    ec="none"))
 
     ax.set_xlabel(r"Zone size $N_z$ (UEs)")
     ax.set_ylabel("Modeled logical latency (s)")
