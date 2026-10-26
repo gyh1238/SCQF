@@ -426,8 +426,8 @@ def panel_zone_law(ax, r, zcol, first):
     # narrow at print size without the text running off the axes
     pad = max(3, len(ref) * 0.10)
     ax.axvspan(len(ref) - 0.5, len(ref) + pad, color=_tint("#c1440e", 0.09), lw=0)
-    ax.text(len(ref) + pad * 0.45, ax.get_ylim()[1] * 0.42,
-            "infeasible: zero mass", rotation=90,
+    ax.text(len(ref) + pad * 0.45, ax.get_ylim()[1] * 0.5,
+            "infeasible:\nzero mass", rotation=90, linespacing=1.0,
             fontsize=FS_LEGEND, color="#c1440e", ha="center", va="center")
     ax.set_xlim(-0.8, len(ref) + pad)
     n_ap = len(zone.aps)
@@ -579,7 +579,7 @@ def panel_ablation(ax, data, first=False):
     lo_v, hi_v = data[:, 0], data[:, 1]
     # extra room below: the summary sits in the lower-right corner, and one
     # instance falls in that corner when the axis starts just under the data
-    lo = min(data.min(), 96.0) - 1.2
+    lo = min(data.min(), 96.0) - 2.0     # room under the lowest point for the stats
     hi = max(data.max(), 100.0) + 0.4
 
     ax.plot([lo, hi], [lo, hi], "-", color="#999999", lw=1.0, zorder=1)
@@ -645,20 +645,31 @@ def main():
     zcol = {z: cmap(i % 20) for i, z in
             enumerate(sorted(r["zone"].idx for r in active))}
 
-    # Two-column layout at print size.  Top: the map (a) with its key below
-    # it, and the two zone laws stacked beside it.  Bottom: the three (c)
-    # panels and the decimation order (d) in one row.
-    fig = plt.figure(figsize=(FIG_W, 6.9))
-    top = fig.add_gridspec(1, 2, width_ratios=[3.3, 3.2], wspace=0.24,
-                           left=0.012, right=0.99, top=0.957, bottom=0.385)
-    left = top[0].subgridspec(2, 1, height_ratios=[3.3, 0.78], hspace=0.0)
-    right = top[1].subgridspec(2, 1, hspace=0.55)
+    # Two-column layout at print size, kept short so it does not take most of
+    # a page.  Heights are laid out in inches: the map (a) is a square with
+    # its key under it, the two zone laws (b) stand beside it and end level
+    # with the key, and the (c)/(d) row runs underneath.
+    H = 5.9
+    t_top, map_h, key_h, gap, row_h = 0.33, 2.85, 0.66, 0.44, 1.12
+    map_top = 1 - t_top / H
+    map_bot = map_top - map_h / H
+    key_bot = map_bot - key_h / H
+    fig = plt.figure(figsize=(FIG_W, H))
+    left = fig.add_gridspec(1, 1, left=0.012, right=0.012 + map_h / FIG_W,
+                            top=map_top, bottom=map_bot)
+    right = fig.add_gridspec(2, 1, hspace=0.62, left=0.5, right=0.99,
+                             top=map_top, bottom=key_bot + 0.40 / H)
+    row_top = key_bot - gap / H
     bottom = fig.add_gridspec(1, 4, wspace=0.62, left=0.065, right=0.985,
-                              top=0.275, bottom=0.075)
+                              top=row_top, bottom=row_top - row_h / H)
 
     ax_map = fig.add_subplot(left[0])
     panel_map(ax_map, inst, part, active, zcol)
     _tag(ax_map, "a")
+    # the title is wider than the map; run it from the map's left edge into
+    # the gap before (b) instead of past the figure's left edge
+    ax_map.title.set_ha("left")
+    ax_map.title.set_x(0.0)
 
     by_idx = {r["zone"].idx: r for r in active}
     zone_panels = ([by_idx[z] for z in ZONE_PANELS]

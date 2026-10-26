@@ -280,7 +280,7 @@ def plot(arr, skipped):
     fig.subplots_adjust(left=0.205, right=0.975, top=0.99, bottom=0.115,
                         hspace=0.12)
     os.makedirs("fig", exist_ok=True)
-    _save(fig, "fig/fig_scaling", formats=("pdf", "png"), dpi=200)
+    _save(fig, "fig/fig_scaling", formats=("pdf", "png"), dpi=400)
     plt.close(fig)
     print("wrote fig/fig_scaling.pdf and .png")
 
@@ -303,7 +303,7 @@ def plot(arr, skipped):
         draw(a)
         _letter(a, stem.split("_")[1])   # the letter the file is named for
         f.tight_layout()
-        _save(f, f"{PANEL_DIR}/{stem}", dpi=200)
+        _save(f, f"{PANEL_DIR}/{stem}", dpi=400)
         plt.close(f)
     print(f"wrote {len(specs)} standalone panels to {PANEL_DIR}/ (pdf + svg + png)")
 
