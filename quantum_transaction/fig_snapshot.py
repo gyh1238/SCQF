@@ -201,7 +201,7 @@ def _tag(ax, letter):
     ax.title.set_text(f"({letter}) {ax.title.get_text()}")
 
 
-def _place_zone_labels(ax, inst, part, active, lo, hi, bset):
+def _place_zone_labels(ax, inst, part, active, lo, hi, bset, zcol):
     """Zone labels placed where they cover the fewest APs.
 
     A label used to sit just above its APs' centroid, and on the campus that
@@ -240,14 +240,14 @@ def _place_zone_labels(ax, inst, part, active, lo, hi, bset):
         t = ax.text(0, 0, text, fontsize=FS_MAP_ZONE, linespacing=0.9)
         ext = t.get_window_extent(renderer)
         t.remove()
-        pad = 2 * 0.1 * FS_MAP_ZONE * pt
+        pad = 2 * 0.15 * FS_MAP_ZONE * pt + 1.3 * pt
         items.append((text, inst.ap_xy[zone.aps], ext.width * dpp + pad,
-                      ext.height * dpp + pad))
+                      ext.height * dpp + pad, zcol.get(zone.idx, "#999999")))
 
     angles = np.deg2rad(np.arange(0, 360, 22.5))
     placed = [None] * len(items)
     for _ in range(3):                    # greedy, then two passes of re-placing
-        for k, (text, own, w, h) in enumerate(items):
+        for k, (text, own, w, h, _) in enumerate(items):
             c = own.mean(axis=0)
             cands = [c]
             for rad in (0.5, 0.75, 1.0, 1.3, 1.7):
@@ -271,12 +271,14 @@ def _place_zone_labels(ax, inst, part, active, lo, hi, bset):
                     best = (cost, box)
             placed[k] = best[1]
 
-    for (text, *_), box in zip(items, placed):
+    # a label moved off its own APs is tied back to them by colour: the box
+    # is outlined in the colour of its zone's AP squares
+    for (text, *_, col), box in zip(items, placed):
         ax.annotate(text, ((box[0] + box[2]) / 2, (box[1] + box[3]) / 2),
                     fontsize=FS_MAP_ZONE, ha="center", va="center", zorder=6,
                     linespacing=0.9,
-                    bbox=dict(boxstyle="round,pad=0.1", fc="white", ec="none",
-                              alpha=0.85))
+                    bbox=dict(boxstyle="round,pad=0.15", fc="white", ec=col,
+                              lw=1.3, alpha=0.9))
 
 
 def panel_map(ax, inst, part, active, zcol, desat=None):
@@ -401,7 +403,7 @@ def panel_map(ax, inst, part, active, zcol, desat=None):
     ax.set_aspect("equal")
     ax.set_xlim(lo[0], hi[0])
     ax.set_ylim(lo[1], hi[1])
-    _place_zone_labels(ax, inst, part, active, lo, hi, bset)
+    _place_zone_labels(ax, inst, part, active, lo, hi, bset, zcol)
     ax.legend(handles=[
         Patch(facecolor="#bbbbbb", edgecolor="black", label="AP (colour = zone)"),
         plt.Line2D([], [], color=_tint("#c1440e", 0.55), lw=0.9,
