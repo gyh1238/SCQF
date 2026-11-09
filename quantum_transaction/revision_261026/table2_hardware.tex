@@ -1,13 +1,13 @@
 \begin{table}[!t]
 \centering
-\caption{Execution on quantum processors. Arrows give the better direction. Measured: $10{,}000$ shots with dynamical decoupling on ibm\_boston, except unit demands on ibm\_kingston, and $500$ shots on IonQ, at $k=0$ on Forte-1 through Amazon Braket without debiasing (61 accepted samples, so its TVD is at the shot-noise level of $0.13$) and at $k=1$ on Forte Enterprise with debiasing (50 accepted samples). Two-qubit gates at $k=0$: $4$ to $8$; at $k=1$: $364$, $787$, $1868$, and $767$ after routing, in row order, and $196$ native on IonQ. Demands $(7,11,5,13)$ use AP capacities $16$ and $31$. Noise-free: exact values, with acceptance $\mu_z$ at $k=0$ and $P_z(1)$ at $k=1$. Fully depolarized: every bitstring equally likely, so the accepted samples are uniform over the feasible set.}
+\caption{Execution on quantum processors. Measured: $10{,}000$ shots with dynamical decoupling on ibm\_boston, except unit demands on ibm\_kingston, and $500$ shots on IonQ, at $k=0$ on Forte-1 through Amazon Braket without debiasing (61 accepted samples, so its TVD is at the shot-noise level of $0.13$) and at $k=1$ on Forte Enterprise with debiasing (50 accepted samples). Two-qubit gates at $k=0$: $4$ to $8$; at $k=1$: $364$, $787$, $1868$, and $767$ after routing, in row order, and $196$ native on IonQ. Demands $(7,11,5,13)$ use AP capacities $16$ and $31$. Noise-free: exact values, with acceptance $\mu_z$ at $k=0$ and $P_z(1)$ at $k=1$. Fully depolarized: every bitstring equally likely, so the accepted samples are uniform over the feasible set.}
 \label{tab:eval_hardware}
 \footnotesize
 \setlength{\tabcolsep}{3pt}
 \begin{tabular}{@{}lcccccc@{}}
 \toprule
 & \multicolumn{2}{c}{Efficiency} & \multicolumn{2}{c}{Accuracy} & \multicolumn{2}{c}{Optimality} \\
-& \multicolumn{2}{c}{Acceptance $\uparrow$} & \multicolumn{2}{c}{TVD $\downarrow$} & \multicolumn{2}{c}{$P(\mathrm{opt})$ $\uparrow$} \\
+& \multicolumn{2}{c}{Acceptance} & \multicolumn{2}{c}{TVD} & \multicolumn{2}{c}{$P(\mathrm{opt})$} \\
 \cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(l){6-7}
 Circuit & $k=0$ & $k=1$ & $k=0$ & $k=1$ & $k=0$ & $k=1$ \\
 \midrule
