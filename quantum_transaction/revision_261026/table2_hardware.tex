@@ -1,6 +1,6 @@
 \begin{table}[!t]
 \centering
-\caption{Execution on quantum processors; exact values in parentheses. Shots: $10{,}000$ per IBM row and $500$ for IonQ. Gates: two-qubit gate count after routing, or native count on IonQ, whose all-to-all connectivity needs no routing; $P(\mathrm{opt})$: probability that an accepted sample is optimal; DD: dynamical decoupling. \textsuperscript{a}Via Amazon Braket, no debiasing; its TVD is at the shot-noise level of its 61 accepted samples (mean $0.13$ for exact sampling).}
+\caption{Execution on quantum processors. Shots: $10{,}000$ per IBM row and $500$ for IonQ. Gates: two-qubit gate count after routing, or native count on IonQ, whose all-to-all connectivity needs no routing; $P(\mathrm{opt})$: probability that an accepted sample is optimal; DD: dynamical decoupling. Random output: every bitstring equally likely, so the accepted samples are uniform over the feasible set. Noise-free: exact values, with acceptance $\mu_z$ at $k=0$ and $P_z(1)$ at $k=1$. \textsuperscript{a}Via Amazon Braket, no debiasing; its TVD is at the shot-noise level of its 61 accepted samples (mean $0.13$ for exact sampling). \textsuperscript{b}With debiasing; 50 accepted samples.}
 \label{tab:eval_hardware}
 \footnotesize
 \setlength{\tabcolsep}{3pt}
@@ -8,24 +8,36 @@
 \toprule
 Circuit & Gates & Acceptance & TVD & $P(\mathrm{opt})$ \\
 \midrule
-\multicolumn{5}{@{}l}{ibm\_boston, $k=0$ (no oracle)} \\
-Three UEs & 6 & 0.298 (0.284) & 0.038 & 0.425 (0.436) \\
-Demands $(1,2,1,2)$ & 8 & 0.138 (0.141) & 0.049 & 0.436 (0.444) \\
-Six UEs & 8 & 0.139 (0.149) & 0.028 & 0.431 (0.423) \\
+\multicolumn{5}{@{}l}{ibm\_boston, three UEs} \\
+Random output & -- & 0.094 & 0.386 & 0.167 \\
+$k=0$ & 6 & 0.298 & 0.038 & 0.425 \\
+$k=1$ & 364 & 0.337 & 0.106 & 0.373 \\
+Noise-free & -- & 0.287 / 0.985 & 0 & 0.436 \\
 \midrule
-\multicolumn{5}{@{}l}{ibm\_boston, $k=1$ (one amplification round)} \\
-Three UEs & 364 & 0.337 (0.985) & 0.106 & 0.373 (0.436) \\
-Demands $(1,2,1,2)$ & 787 & 0.125 (0.838) & 0.159 & 0.299 (0.444) \\
-\quad without DD & 787 & 0.034 (0.838) & 0.437 & 0.079 (0.444) \\
-Six UEs & 1868 & 0.036 (0.860) & 0.248 & 0.222 (0.423) \\
+\multicolumn{5}{@{}l}{ibm\_boston, four UEs, demands $(1,2,1,2)$} \\
+Random output & -- & 0.039 & 0.379 & 0.100 \\
+$k=0$ & 8 & 0.138 & 0.049 & 0.436 \\
+$k=1$ & 787 & 0.125 & 0.159 & 0.299 \\
+\quad without DD & 787 & 0.034 & 0.437 & 0.079 \\
+Noise-free & -- & 0.141 / 0.836 & 0 & 0.444 \\
 \midrule
-\multicolumn{5}{@{}l}{ibm\_kingston, four UEs} \\
-$k=0$ & 8 & 0.107 (0.099) & 0.015 & 0.630 (0.632) \\
-$k=1$ & 767 & 0.050 (0.671) & 0.302 & 0.331 (0.632) \\
+\multicolumn{5}{@{}l}{ibm\_boston, four UEs, demands $(7,11,5,13)$} \\
+Random output & -- & 0.023 & 0.373 & 0.167 \\
+$k=0$ & 8 & 0.139 & 0.028 & 0.431 \\
+$k=1$ & 1868 & 0.036 & 0.248 & 0.222 \\
+Noise-free & -- & 0.148 / 0.858 & 0 & 0.423 \\
 \midrule
-\multicolumn{5}{@{}l}{IonQ, demands $(1,2,1,2)$} \\
-Forte-1, $k=0$\textsuperscript{a} & 4 & 0.122 (0.141) & 0.123 & 0.443 (0.444) \\
-Forte Enterprise, $k=1$ & 196 & 0.099 (0.836) & 0.257 & 0.240 (0.444) \\
+\multicolumn{5}{@{}l}{ibm\_kingston, four UEs, unit demands} \\
+Random output & -- & 0.023 & 0.466 & 0.167 \\
+$k=0$ & 8 & 0.107 & 0.015 & 0.630 \\
+$k=1$ & 767 & 0.050 & 0.302 & 0.331 \\
+Noise-free & -- & 0.099 / 0.671 & 0 & 0.632 \\
+\midrule
+\multicolumn{5}{@{}l}{IonQ, four UEs, demands $(1,2,1,2)$} \\
+Random output & -- & 0.039 & 0.379 & 0.100 \\
+Forte-1, $k=0$\textsuperscript{a} & 4 & 0.122 & 0.123 & 0.443 \\
+Forte Enterprise, $k=1$\textsuperscript{b} & 196 & 0.099 & 0.257 & 0.240 \\
+Noise-free & -- & 0.141 / 0.836 & 0 & 0.444 \\
 \bottomrule
 \end{tabular}
 \end{table}
